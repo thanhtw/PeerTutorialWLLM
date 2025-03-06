@@ -1,0 +1,202 @@
+{
+    "CompileTimeErrors": [
+        {
+            "error_name": "Cannot find symbol",
+            "description": "Occurs when a variable, method, or class is not defined or not accessible in the scope."
+        },
+        {
+            "error_name": "Incompatible types",
+            "description": "Happens when assigning a value of one type to a variable of another incompatible type."
+        },
+        {
+            "error_name": "Missing return statement",
+            "description": "Occurs when a method that is supposed to return a value does not have a return statement."
+        },
+        {
+            "error_name": "Illegal start of expression",
+            "description": "Caused by syntax errors such as misplaced keywords or missing punctuation."
+        },
+        {
+            "error_name": "Class not found",
+            "description": "Occurs when a referenced class is not found in the specified package or classpath."
+        },
+        {
+            "error_name": "Package does not exist",
+            "description": "Thrown when attempting to import a package that does not exist or is misspelled."
+        },
+        {
+            "error_name": "Unreachable statement",
+            "description": "Occurs when code cannot be reached due to a return, break, or continue statement earlier in the flow."
+        },
+        {
+            "error_name": "Variable might not have been initialized",
+            "description": "Occurs when a local variable is used before it has been initialized."
+        },
+        {
+            "error_name": "Method does not override method from its superclass",
+            "description": "Happens when using the @Override annotation, but the method doesn't actually override a superclass method."
+        },
+        {
+            "error_name": "Cyclic inheritance",
+            "description": "Occurs when a class hierarchy forms a cycle through inheritance or interface implementation."
+        },
+        {
+            "error_name": "Duplicate class",
+            "description": "Happens when two classes with the same name exist in the same package."
+        },
+        {
+            "error_name": "Unchecked or unsafe operations",
+            "description": "Occurs when using raw types instead of parameterized types in generic code."
+        },
+        {
+            "error_name": "Type mismatch: cannot convert",
+            "description": "Happens when there's an incompatible type conversion in an expression or assignment."
+        },
+        {
+            "error_name": "Unreported exception",
+            "description": "Occurs when a checked exception is thrown but not caught or declared in the method signature."
+        }
+    ],
+    "RuntimeErrors": [
+        {
+            "error_name": "NullPointerException",
+            "description": "Thrown when trying to access a method or field on a null object reference."
+        },
+        {
+            "error_name": "ArrayIndexOutOfBoundsException",
+            "description": "Happens when attempting to access an array index that is out of its valid range."
+        },
+        {
+            "error_name": "ArithmeticException",
+            "description": "Occurs when performing an invalid arithmetic operation, such as division by zero."
+        },
+        {
+            "error_name": "ClassCastException",
+            "description": "Thrown when an object is cast to an incompatible type."
+        },
+        {
+            "error_name": "IllegalArgumentException",
+            "description": "Occurs when an illegal argument is passed to a method."
+        },
+        {
+            "error_name": "StackOverflowError",
+            "description": "Occurs when a recursive method calls itself indefinitely, exhausting stack memory."
+        },
+        {
+            "error_name": "OutOfMemoryError",
+            "description": "Thrown when the Java Virtual Machine runs out of memory."
+        },
+        {
+            "error_name": "StringIndexOutOfBoundsException",
+            "description": "Thrown when attempting to access a character at an invalid index in a string."
+        },
+        {
+            "error_name": "NumberFormatException",
+            "description": "Occurs when attempting to convert a string to a numeric type but the string doesn't have a valid format."
+        },
+        {
+            "error_name": "ConcurrentModificationException",
+            "description": "Thrown when a collection is modified while being iterated over using an iterator."
+        },
+        {
+            "error_name": "FileNotFoundException",
+            "description": "Occurs when attempting to access a file that does not exist or cannot be found."
+        },
+        {
+            "error_name": "NoSuchElementException",
+            "description": "Thrown when trying to access an element that doesn't exist in a collection."
+        },
+        {
+            "error_name": "IllegalStateException",
+            "description": "Thrown when a method is invoked at an inappropriate time or when an object is in an inappropriate state."
+        },
+        {
+            "error_name": "UnsupportedOperationException",
+            "description": "Thrown when an unsupported operation is attempted, commonly in read-only collections."
+        },
+        {
+            "error_name": "IndexOutOfBoundsException",
+            "description": "Thrown when an index of some sort (such as to a list or string) is out of range."
+        }
+    ],
+    "LogicalErrors": [
+        {
+            "error_name": "Incorrect loop condition",
+            "description": "Occurs when a loop condition is incorrect, leading to infinite loops or premature exits."
+        },
+        {
+            "error_name": "Off-by-one error",
+            "description": "Happens when a loop iterates one time too many or one time too few."
+        },
+        {
+            "error_name": "Using assignment instead of comparison",
+            "description": "Occurs when `=` is used instead of `==` in a condition."
+        },
+        {
+            "error_name": "Incorrect operator precedence",
+            "description": "Happens when operations are performed in an unintended order due to precedence rules."
+        },
+        {
+            "error_name": "Logic flaw in conditional statements",
+            "description": "Causes unexpected behavior due to incorrect logical conditions."
+        },
+        {
+            "error_name": "String comparison using == instead of equals()",
+            "description": "Using == to compare strings checks for reference equality instead of content equality."
+        },
+        {
+            "error_name": "Unintended integer division",
+            "description": "Occurs when dividing two integers and expecting a floating-point result."
+        },
+        {
+            "error_name": "Floating-point precision issues",
+            "description": "Occurs when comparing floating-point numbers directly for equality without accounting for precision errors."
+        },
+        {
+            "error_name": "Ignoring method return values",
+            "description": "Not checking or using the return value of a method, especially for methods that return status or transformed values."
+        },
+        {
+            "error_name": "Resource leaks",
+            "description": "Not properly closing resources like files, database connections, or network sockets."
+        },
+        {
+            "error_name": "Race conditions",
+            "description": "Occurs in multi-threaded applications when the timing or sequence of operations affects the correctness of a program."
+        },
+        {
+            "error_name": "Deadlock",
+            "description": "Happens when two or more threads are blocked forever, waiting for each other to release resources."
+        },
+        {
+            "error_name": "Boundary value errors",
+            "description": "Not properly handling edge cases like empty collections, minimum/maximum values, or other boundary conditions."
+        }
+    ],
+    "WarningsAndHints": [
+        {
+            "error_name": "Unused variable",
+            "description": "A variable is declared but never used in the code."
+        },
+        {
+            "error_name": "Redundant cast",
+            "description": "A cast operation that is unnecessary because the type is already compatible."
+        },
+        {
+            "error_name": "Deprecated API usage",
+            "description": "Using methods or classes that are marked as deprecated in the Java API."
+        },
+        {
+            "error_name": "Unchecked conversion",
+            "description": "Converting a raw type to a parameterized type without type checking."
+        },
+        {
+            "error_name": "Serial version UID warning",
+            "description": "Missing serialVersionUID field in a Serializable class, which may cause compatibility issues."
+        },
+        {
+            "error_name": "Platform-dependent encoding",
+            "description": "Using the default character encoding which may vary across different platforms."
+        }
+    ]
+}
