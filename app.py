@@ -1,32 +1,46 @@
 """
-Refactored Java Peer Code Review Training System - Main Application
+Streamlit UI for Java Peer Review Training System.
 
 This module provides a Streamlit web interface for the Java code review training system
-with an improved modular architecture, object-oriented design, and direct JSON error handling.
+integrated with the LangGraph workflow implementation.
 """
 
 import streamlit as st
-import sys
 import os
 import logging
 import time
+import sys
+import traceback
 from typing import Dict, List, Any, Optional
-from dotenv import load_dotenv
+from datetime import datetime
 
-# Import components from the refactored architecture
-from service.agent_service import AgentService
-from ui.ui_components import ErrorSelectorUI, CodeDisplayUI, FeedbackDisplayUI
-from llm_manager import LLMManager
-
-# Configure logging
+# Configure logging to see any issues
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
+# Add debug prints to help identify loading issues
+print("Starting app imports...")
+
+try:
+    # Import the LangGraph implementation
+    from langgraph_implementation import (
+        CodeReviewAgent, 
+        CodeReviewGraph, 
+        CodeReviewState, 
+        ErrorRepository
+    )
+    print("Successfully imported LangGraph implementation")
+except Exception as e:
+    print(f"Error importing LangGraph implementation: {str(e)}")
+    traceback.print_exc()
+    st.error(f"Failed to load LangGraph implementation: {str(e)}")
+    st.stop()
+
+print("Imports completed")
 
 # Set page config
 st.set_page_config(
@@ -146,204 +160,102 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def check_ollama_status() -> Dict[str, bool]:
-    """
-    Check the status of Ollama and required models.
-    
-    Returns:
-        Dictionary with status information
-    """
-    llm_manager = LLMManager()
-    
-    # Check Ollama connection
-    connection_status, _ = llm_manager.check_ollama_connection()
-    
-    # Check if default model is available
-    default_model_available = False
-    if connection_status:
-        default_model = llm_manager.default_model
-        default_model_available = llm_manager.check_model_availability(default_model)
-    
-    # Check if all role-specific models are configured in environment
-    required_models = ["GENERATIVE_MODEL", "REVIEW_MODEL", "SUMMARY_MODEL", "COMPARE_MODEL"]
-    all_models_configured = all(os.getenv(model) for model in required_models)
-    
-    return {
-        "ollama_running": connection_status,
-        "default_model_available": default_model_available,
-        "all_models_configured": all_models_configured
-    }
-
-def init_session_state():
-    """Initialize session state variables."""
-    # General state
-    if 'code_snippet' not in st.session_state:
-        st.session_state.code_snippet = ""
-    if 'known_problems' not in st.session_state:
-        st.session_state.known_problems = []
-    if 'student_review' not in st.session_state:
-        st.session_state.student_review = ""
-    if 'active_tab' not in st.session_state:
-        st.session_state.active_tab = 0
-    if 'current_step' not in st.session_state:
-        st.session_state.current_step = "generate"
-    if 'error' not in st.session_state:
-        st.session_state.error = None
-    
-    # Iteration tracking
-    if 'iteration_count' not in st.session_state:
-        st.session_state.iteration_count = 1
-    if 'max_iterations' not in st.session_state:
-        st.session_state.max_iterations = 3
-    
-    # Analysis results
-    if 'review_analysis' not in st.session_state:
-        st.session_state.review_analysis = None
-    if 'review_history' not in st.session_state:
-        st.session_state.review_history = []
-    if 'targeted_guidance' not in st.session_state:
-        st.session_state.targeted_guidance = None
-    if 'review_summary' not in st.session_state:
-        st.session_state.review_summary = None
-    if 'comparison_report' not in st.session_state:
-        st.session_state.comparison_report = None
-
-def generate_code_problem(agent_service: AgentService, 
-                         params: Dict[str, str], 
-                         selected_error_categories: Dict[str, List[str]]):
-    """
-    Generate a code problem with progress indicator.
-    
-    Args:
-        agent_service: AgentService instance
-        params: Code generation parameters
-        selected_error_categories: Selected error categories
-    """
-    # Show progress during generation
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
+def initialize_session():
+    """Initialize session state and components."""
     try:
-        status_text.text("Generating Java code problem...")
-        progress_bar.progress(30)
+        print("Initializing session state")
         
-        # Generate code problem
-        result = agent_service.generate_code_with_errors(
-            code_length=params["code_length"],
-            difficulty_level=params["difficulty_level"],
-            selected_error_categories=selected_error_categories
-        )
+        # Initialize general state
+        if "code_state" not in st.session_state:
+            st.session_state.code_state = None
+        if "error" not in st.session_state:
+            st.session_state.error = None
+        if "active_tab" not in st.session_state:
+            st.session_state.active_tab = 0
+        if "max_iterations" not in st.session_state:
+            st.session_state.max_iterations = 3
         
-        progress_bar.progress(90)
-        status_text.text("Finalizing results...")
-        time.sleep(0.5)
+        # Initialize error repository
+        if "error_repository" not in st.session_state:
+            print("Initializing error repository")
+            st.session_state.error_repository = ErrorRepository()
         
-        # Check for errors
-        if "error" in result:
-            progress_bar.empty()
-            status_text.empty()
-            st.session_state.error = result["error"]
-            return False
+        # Initialize error selection mode and categories
+        if "error_selection_mode" not in st.session_state:
+            st.session_state.error_selection_mode = "standard"
+        if "selected_error_categories" not in st.session_state:
+            st.session_state.selected_error_categories = {
+                "build": [],
+                "checkstyle": []
+            }
         
-        # Update session state
-        st.session_state.code_snippet = result.get("code_snippet", "")
-        st.session_state.known_problems = result.get("known_problems", [])
-        st.session_state.current_step = "review"
-        st.session_state.active_tab = 1  # Move to the review tab
-        st.session_state.iteration_count = 1
-        st.session_state.error = None
-        
-        progress_bar.progress(100)
-        status_text.text("Complete!")
-        time.sleep(0.5)
-        
-        # Clear progress indicators
-        progress_bar.empty()
-        status_text.empty()
-        
-        return True
-        
+        # Initialize agent if not already done
+        if "agent" not in st.session_state:
+            print("Initializing agent")
+            with st.spinner("Initializing system..."):
+                st.session_state.agent = CodeReviewAgent()
+                print("Agent initialized successfully")
+                
+        print("Session initialization complete")
     except Exception as e:
-        logger.error(f"Error generating code problem: {str(e)}")
-        progress_bar.empty()
-        status_text.empty()
-        st.session_state.error = f"Error generating code problem: {str(e)}"
-        return False
+        print(f"Error in initialize_session: {str(e)}")
+        traceback.print_exc()
+        st.error(f"Failed to initialize session: {str(e)}")
 
-def process_student_review(agent_service: AgentService, student_review: str):
-    """
-    Process a student review with progress indicator.
-    
-    Args:
-        agent_service: AgentService instance
-        student_review: Student review text
-    """
-    # Show progress during analysis
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
+def check_ollama_status():
+    """Check the status of Ollama and required models."""
     try:
-        status_text.text("Processing student review...")
-        progress_bar.progress(20)
+        import requests
+        print("Checking Ollama status")
+        ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         
-        # Update the student review in session state
-        st.session_state.student_review = student_review
+        # Check Ollama connection
+        connection_status = False
+        try:
+            response = requests.get(f"{ollama_base_url}/api/tags", timeout=5)
+            connection_status = response.status_code == 200
+            print(f"Ollama connection status: {connection_status}")
+        except Exception as e:
+            print(f"Error connecting to Ollama: {str(e)}")
+            connection_status = False
         
-        # Process the review
-        status_text.text("Analyzing your review...")
-        progress_bar.progress(40)
+        # Check if default model is available
+        default_model = os.getenv("DEFAULT_MODEL", "llama3:1b")
+        default_model_available = False
         
-        result = agent_service.process_student_review(student_review)
+        if connection_status:
+            try:
+                response = requests.get(f"{ollama_base_url}/api/tags", timeout=5)
+                if response.status_code == 200:
+                    models = response.json().get("models", [])
+                    default_model_available = any(model["name"] == default_model for model in models)
+                    print(f"Default model available: {default_model_available}")
+            except Exception as e:
+                print(f"Error checking model availability: {str(e)}")
+                default_model_available = False
         
-        status_text.text("Generating feedback...")
-        progress_bar.progress(70)
+        # Check if all role-specific models are configured in environment
+        required_models = ["GENERATIVE_MODEL", "REVIEW_MODEL", "SUMMARY_MODEL", "COMPARE_MODEL"]
+        all_models_configured = all(os.getenv(model) for model in required_models)
+        print(f"All models configured: {all_models_configured}")
         
-        # Check for errors
-        if "error" in result:
-            progress_bar.empty()
-            status_text.empty()
-            st.session_state.error = result["error"]
-            return False
-        
-        # Update session state
-        st.session_state.review_analysis = result.get("review_analysis", {})
-        st.session_state.review_history = agent_service.get_review_history()
-        st.session_state.targeted_guidance = result.get("targeted_guidance", "")
-        st.session_state.current_step = result.get("current_step", "wait_for_review")
-        
-        # If complete, get summary and comparison
-        if result.get("current_step") == "complete":
-            st.session_state.review_summary = result.get("review_summary", "")
-            st.session_state.comparison_report = result.get("comparison_report", "")
-            st.session_state.active_tab = 2  # Move to the analysis tab
-        else:
-            # Update iteration count for next review
-            st.session_state.iteration_count = result.get("iteration_count", 1)
-        
-        progress_bar.progress(100)
-        status_text.text("Analysis complete!")
-        time.sleep(0.5)
-        
-        # Clear progress indicators
-        progress_bar.empty()
-        status_text.empty()
-        
-        return True
-        
+        return {
+            "ollama_running": connection_status,
+            "default_model_available": default_model_available,
+            "all_models_configured": all_models_configured
+        }
     except Exception as e:
-        logger.error(f"Error processing student review: {str(e)}")
-        progress_bar.empty()
-        status_text.empty()
-        st.session_state.error = f"Error processing student review: {str(e)}"
-        return False
+        print(f"Error checking Ollama status: {str(e)}")
+        traceback.print_exc()
+        return {
+            "ollama_running": False,
+            "default_model_available": False,
+            "all_models_configured": False,
+            "error": str(e)
+        }
 
-def render_sidebar(llm_manager: LLMManager):
-    """
-    Render the sidebar with status and settings.
-    
-    Args:
-        llm_manager: LLMManager instance
-    """
+def render_sidebar():
+    """Render the sidebar with status and settings."""
     with st.sidebar:
         st.header("Model Settings")
         
@@ -380,14 +292,25 @@ def render_sidebar(llm_manager: LLMManager):
         else:
             st.markdown(f"- Default model: <span class='status-warning'>Not Found</span>", unsafe_allow_html=True)
             if status["ollama_running"]:
-                st.warning(f"Default model '{llm_manager.default_model}' not found. You need to pull it.")
+                default_model = os.getenv("DEFAULT_MODEL", "llama3:1b")
+                st.warning(f"Default model '{default_model}' not found. You need to pull it.")
                 if st.button("Pull Default Model"):
-                    with st.spinner(f"Pulling {llm_manager.default_model}..."):
-                        if llm_manager.download_ollama_model(llm_manager.default_model):
-                            st.success("Default model pulled successfully!")
-                            st.rerun()
-                        else:
-                            st.error("Failed to pull default model.")
+                    with st.spinner(f"Pulling {default_model}..."):
+                        try:
+                            import requests
+                            ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+                            response = requests.post(
+                                f"{ollama_base_url}/api/pull",
+                                json={"name": default_model, "stream": False},
+                                timeout=60
+                            )
+                            if response.status_code == 200:
+                                st.success("Default model pulled successfully!")
+                                st.rerun()
+                            else:
+                                st.error("Failed to pull default model.")
+                        except Exception as e:
+                            st.error(f"Error pulling model: {str(e)}")
         
         if status["all_models_configured"]:
             st.markdown(f"- Model configuration: <span class='status-ok'>Complete</span>", unsafe_allow_html=True)
@@ -409,187 +332,566 @@ def render_sidebar(llm_manager: LLMManager):
         # Update max iterations in session state
         if max_iterations != st.session_state.max_iterations:
             st.session_state.max_iterations = max_iterations
+            
+            # Update max iterations in code state if already generated
+            if st.session_state.code_state:
+                st.session_state.code_state.max_iterations = max_iterations
+
+def render_error_selector():
+    """Render the error category selector UI."""
+    st.subheader("Select Error Types")
+    st.info("Choose the types of errors to include in the generated Java code.")
+    
+    # Error selection mode toggle
+    error_mode = st.radio(
+        "Error Selection Mode",
+        options=["Standard (by problem areas)", "Advanced (by specific error categories)"],
+        index=0 if st.session_state.error_selection_mode == "standard" else 1,
+        key="error_mode_selector"
+    )
+    
+    # Update error selection mode
+    if "Standard" in error_mode and st.session_state.error_selection_mode != "standard":
+        st.session_state.error_selection_mode = "standard"
+        # Reset selected categories
+        st.session_state.selected_error_categories = {"build": [], "checkstyle": []}
+    elif "Advanced" in error_mode and st.session_state.error_selection_mode != "advanced":
+        st.session_state.error_selection_mode = "advanced"
+    
+    # Get code generation parameters
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        difficulty_level = st.select_slider(
+            "Difficulty Level",
+            options=["Easy", "Medium", "Hard"],
+            value="Medium",
+            key="difficulty_slider"
+        )
+    
+    with col2:
+        code_length = st.select_slider(
+            "Code Length",
+            options=["Short", "Medium", "Long"],
+            value="Medium",
+            key="length_slider"
+        )
+    
+    # Error selection UI
+    if st.session_state.error_selection_mode == "standard":
+        # In standard mode, use simple problem area selection
+        problem_areas = st.multiselect(
+            "Problem Areas",
+            ["Style", "Logical", "Performance", "Security", "Design"],
+            default=["Style", "Logical", "Performance"],
+            key="problem_areas_selector"
+        )
+        
+        # Map problem areas to categories for the backend
+        selected_categories = {
+            "build": [],
+            "checkstyle": []
+        }
+        
+        # Map problem areas to error categories
+        area_mapping = {
+            "Style": {
+                "build": [],
+                "checkstyle": ["NamingConventionChecks", "WhitespaceAndFormattingChecks", "JavadocChecks"]
+            },
+            "Logical": {
+                "build": ["LogicalErrors"],
+                "checkstyle": []
+            },
+            "Performance": {
+                "build": ["RuntimeErrors"],
+                "checkstyle": ["MetricsChecks"]
+            },
+            "Security": {
+                "build": ["RuntimeErrors", "LogicalErrors"],
+                "checkstyle": ["CodeQualityChecks"]
+            },
+            "Design": {
+                "build": ["LogicalErrors"],
+                "checkstyle": ["MiscellaneousChecks", "FileStructureChecks", "BlockChecks"]
+            }
+        }
+        
+        # Build selected categories from problem areas
+        for area in problem_areas:
+            if area in area_mapping:
+                mapping = area_mapping[area]
+                for category in mapping["build"]:
+                    if category not in selected_categories["build"]:
+                        selected_categories["build"].append(category)
+                for category in mapping["checkstyle"]:
+                    if category not in selected_categories["checkstyle"]:
+                        selected_categories["checkstyle"].append(category)
+        
+        st.session_state.selected_error_categories = selected_categories
+    else:
+        # In advanced mode, let user select specific error categories
+        all_categories = st.session_state.error_repository.get_all_categories()
+        
+        # Build errors section
+        st.markdown("#### Build Errors")
+        build_categories = all_categories.get("build", [])
+        build_cols = st.columns(2)
+        
+        # Split the build categories into two columns
+        half_length = len(build_categories) // 2
+        for i, col in enumerate(build_cols):
+            start_idx = i * half_length
+            end_idx = start_idx + half_length if i == 0 else len(build_categories)
+            
+            with col:
+                for category in build_categories[start_idx:end_idx]:
+                    # Create a unique key for this category
+                    category_key = f"build_{category}"
+                    
+                    # Check if category is selected
+                    is_selected = st.checkbox(
+                        category,
+                        key=category_key,
+                        value=category in st.session_state.selected_error_categories["build"]
+                    )
+                    
+                    # Update selection state
+                    if is_selected:
+                        if category not in st.session_state.selected_error_categories["build"]:
+                            st.session_state.selected_error_categories["build"].append(category)
+                    else:
+                        if category in st.session_state.selected_error_categories["build"]:
+                            st.session_state.selected_error_categories["build"].remove(category)
+        
+        # Checkstyle errors section
+        st.markdown("#### Checkstyle Errors")
+        checkstyle_categories = all_categories.get("checkstyle", [])
+        checkstyle_cols = st.columns(2)
+        
+        # Split the checkstyle categories into two columns
+        half_length = len(checkstyle_categories) // 2
+        for i, col in enumerate(checkstyle_cols):
+            start_idx = i * half_length
+            end_idx = start_idx + half_length if i == 0 else len(checkstyle_categories)
+            
+            with col:
+                for category in checkstyle_categories[start_idx:end_idx]:
+                    # Create a unique key for this category
+                    category_key = f"checkstyle_{category}"
+                    
+                    # Check if category is selected
+                    is_selected = st.checkbox(
+                        category,
+                        key=category_key,
+                        value=category in st.session_state.selected_error_categories["checkstyle"]
+                    )
+                    
+                    # Update selection state
+                    if is_selected:
+                        if category not in st.session_state.selected_error_categories["checkstyle"]:
+                            st.session_state.selected_error_categories["checkstyle"].append(category)
+                    else:
+                        if category in st.session_state.selected_error_categories["checkstyle"]:
+                            st.session_state.selected_error_categories["checkstyle"].remove(category)
+    
+    return {
+        "difficulty_level": difficulty_level.lower(),
+        "code_length": code_length.lower(),
+        "selected_error_categories": st.session_state.selected_error_categories
+    }
+
+def generate_code_problem(params):
+    """Generate a code problem with progress indicator."""
+    # Show progress during generation
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    try:
+        status_text.text("Initializing Java code generation...")
+        progress_bar.progress(20)
+        
+        # Create initial state with parameters
+        print("Creating initial state for code generation")
+        code_state = CodeReviewGraph(
+            current_state=CodeReviewState.GENERATE,
+            max_iterations=st.session_state.max_iterations
+        )
+        
+        status_text.text("Generating Java code problem...")
+        progress_bar.progress(40)
+        
+        # Generate code problem
+        print("Calling agent.generate_code_problem()")
+        result = st.session_state.agent.generate_code_problem()
+        print(f"Code generation complete, state: {result.current_state}")
+        
+        progress_bar.progress(90)
+        status_text.text("Finalizing results...")
+        time.sleep(0.5)
+        
+        # Check for errors
+        if result.current_state == CodeReviewState.ERROR:
+            progress_bar.empty()
+            status_text.empty()
+            st.session_state.error = result.error_message
+            print(f"Code generation error: {result.error_message}")
+            return False
+        
+        # Update session state
+        st.session_state.code_state = result
+        st.session_state.active_tab = 1  # Move to the review tab
+        st.session_state.error = None
+        
+        progress_bar.progress(100)
+        status_text.text("Complete!")
+        time.sleep(0.5)
+        
+        # Clear progress indicators
+        progress_bar.empty()
+        status_text.empty()
+        
+        print("Code generation successful")
+        return True
+        
+    except Exception as e:
+        print(f"Error generating code problem: {str(e)}")
+        traceback.print_exc()
+        progress_bar.empty()
+        status_text.empty()
+        st.session_state.error = f"Error generating code problem: {str(e)}"
+        return False
+
+def process_student_review(student_review):
+    """Process a student review with progress indicator."""
+    # Show progress during analysis
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    try:
+        status_text.text("Processing student review...")
+        progress_bar.progress(20)
+        
+        status_text.text("Analyzing your review...")
+        progress_bar.progress(40)
+        
+        # Submit the review
+        print("Submitting student review for analysis")
+        result = st.session_state.agent.submit_review(st.session_state.code_state, student_review)
+        print(f"Review analysis complete, state: {result.current_state}")
+        
+        status_text.text("Generating feedback...")
+        progress_bar.progress(70)
+        
+        # Check for errors
+        if result.current_state == CodeReviewState.ERROR:
+            progress_bar.empty()
+            status_text.empty()
+            st.session_state.error = result.error_message
+            print(f"Review analysis error: {result.error_message}")
+            return False
+        
+        # Update session state
+        st.session_state.code_state = result
+        
+        # If complete, move to the analysis tab
+        if result.current_state == CodeReviewState.COMPLETE:
+            st.session_state.active_tab = 2  # Move to the analysis tab
+        
+        progress_bar.progress(100)
+        status_text.text("Analysis complete!")
+        time.sleep(0.5)
+        
+        # Clear progress indicators
+        progress_bar.empty()
+        status_text.empty()
+        
+        print("Review processing successful")
+        return True
+        
+    except Exception as e:
+        print(f"Error processing student review: {str(e)}")
+        traceback.print_exc()
+        progress_bar.empty()
+        status_text.empty()
+        st.session_state.error = f"Error processing student review: {str(e)}"
+        return False
+
+def render_code_display(code_snippet, known_problems=None):
+    """Render a code snippet with optional known problems for instructor view."""
+    if not code_snippet:
+        st.info("No code generated yet. Use the 'Generate Code Problem' tab to create a Java code snippet.")
+        return
+    
+    st.subheader("Java Code to Review:")
+    
+    # Add line numbers to the code snippet
+    lines = code_snippet.splitlines()
+    max_line_num = len(lines)
+    padding = len(str(max_line_num))
+    
+    # Create a list of lines with line numbers
+    numbered_lines = []
+    for i, line in enumerate(lines, 1):
+        # Format line number with consistent padding
+        line_num = str(i).rjust(padding)
+        numbered_lines.append(f"{line_num} | {line}")
+    
+    numbered_code = "\n".join(numbered_lines)
+    st.code(numbered_code, language="java")
+    
+    # INSTRUCTOR VIEW: Show known problems if provided
+    if known_problems:
+        if st.checkbox("Show Known Problems (Instructor View)", value=False, key="show_problems_checkbox"):
+            st.subheader("Known Problems:")
+            for i, problem in enumerate(known_problems, 1):
+                st.markdown(f"{i}. {problem}")
+
+def render_review_input(student_review=""):
+    """Render a text area for student review input with guidance."""
+    code_state = st.session_state.code_state
+    
+    # Show iteration badge if not the first iteration
+    if code_state.iteration_count > 1:
+        st.header(
+            f"Submit Your Code Review "
+            f"<span class='iteration-badge'>Attempt {code_state.iteration_count} of "
+            f"{code_state.max_iterations}</span>", 
+            unsafe_allow_html=True
+        )
+    else:
+        st.header("Submit Your Code Review")
+    
+    # Display targeted guidance if available (for iterations after the first)
+    if code_state.targeted_guidance and code_state.iteration_count > 1:
+        st.markdown(
+            f'<div class="guidance-box">'
+            f'<h4>Review Guidance</h4>'
+            f'{code_state.targeted_guidance}'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        
+        # Show previous attempt results if available
+        if code_state.review_analysis:
+            st.markdown(
+                f'<div class="warning-box">'
+                f'<h4>Previous Attempt Results</h4>'
+                f'You identified {code_state.review_analysis.identified_count} of '
+                f'{code_state.review_analysis.total_problems} issues '
+                f'({code_state.review_analysis.identified_percentage:.1f}%). '
+                f'Can you find more issues in this attempt?'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+    
+    st.subheader("Your Review:")
+    st.write("Please review the code above and identify any issues or problems:")
+    
+    # Create a unique key for the text area
+    text_area_key = f"student_review_input_{code_state.iteration_count}"
+    
+    # Get or update the student review
+    student_review_input = st.text_area(
+        "Enter your review comments here",
+        value=student_review,
+        height=200,
+        key=text_area_key
+    )
+    
+    # Submit button
+    submit_text = "Submit Review" if code_state.iteration_count == 1 else f"Submit Review (Attempt {code_state.iteration_count} of {code_state.max_iterations})"
+    
+    if st.button(submit_text, type="primary", key="submit_review_button"):
+        if not student_review_input.strip():
+            st.warning("Please enter your review before submitting.")
+        else:
+            with st.spinner("Analyzing your review..."):
+                success = process_student_review(student_review_input)
+                if success:
+                    st.rerun()
+
+def render_results():
+    """Render the analysis results and feedback."""
+    code_state = st.session_state.code_state
+    
+    if not code_state or not (code_state.comparison_report or code_state.review_summary):
+        st.info("No analysis results available. Please submit your review in the 'Submit Review' tab first.")
+        return
+    
+    # Display the comparison report
+    if code_state.comparison_report:
+        st.subheader("Educational Feedback:")
+        st.markdown(
+            f'<div class="comparison-report">{code_state.comparison_report}</div>',
+            unsafe_allow_html=True
+        )
+    
+    # Show review history in an expander if there are multiple iterations
+    if code_state.review_history and len(code_state.review_history) > 1:
+        with st.expander("Review History", expanded=False):
+            st.write("Your review attempts:")
+            
+            for review in code_state.review_history:
+                review_analysis = review.review_analysis
+                iteration = review.iteration_number
+                
+                st.markdown(
+                    f'<div class="review-history-item">'
+                    f'<h4>Attempt {iteration}</h4>'
+                    f'<p>Found {review_analysis.identified_count} of '
+                    f'{review_analysis.total_problems} issues '
+                    f'({review_analysis.accuracy_percentage:.1f}% accuracy)</p>'
+                    f'<details>'
+                    f'<summary>View this review</summary>'
+                    f'<pre>{review.student_review}</pre>'
+                    f'</details>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+    
+    # Display analysis details in an expander
+    if code_state.review_summary or code_state.review_analysis:
+        with st.expander("Detailed Analysis", expanded=False):
+            # Display review summary
+            if code_state.review_summary:
+                st.subheader("Review Summary:")
+                st.markdown(code_state.review_summary)
+            
+            # Display review analysis
+            if code_state.review_analysis:
+                st.subheader("Review Analysis:")
+                accuracy = code_state.review_analysis.accuracy_percentage
+                identified_percentage = code_state.review_analysis.identified_percentage
+                
+                st.write(f"**Accuracy:** {accuracy:.1f}%")
+                st.write(f"**Problems Identified:** {identified_percentage:.1f}% of all issues")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write("**Correctly Identified Issues:**")
+                    for issue in code_state.review_analysis.identified_problems:
+                        st.write(f"✓ {issue}")
+                
+                with col2:
+                    st.write("**Missed Issues:**")
+                    for issue in code_state.review_analysis.missed_problems:
+                        st.write(f"✗ {issue}")
+                
+                # Display false positives if any
+                if code_state.review_analysis.false_positives:
+                    st.write("**False Positives:**")
+                    for issue in code_state.review_analysis.false_positives:
+                        st.write(f"⚠ {issue}")
+    
+    # Start over button
+    if st.button("Start New Review", type="primary", key="start_new_review_button"):
+        try:
+            # Reset the agent
+            print("Resetting session")
+            st.session_state.agent.reset_session()
+            
+            # Reset session state
+            st.session_state.code_state = None
+            st.session_state.error = None
+            st.session_state.active_tab = 0
+            
+            # Rerun the app
+            st.rerun()
+        except Exception as e:
+            print(f"Error resetting session: {str(e)}")
+            traceback.print_exc()
+            st.error(f"Error resetting session: {str(e)}")
 
 def main():
     """Main application function."""
-    # Initialize session state
-    init_session_state()
-    
-    # Initialize services
-    llm_manager = LLMManager()
-    agent_service = AgentService(llm_manager)
-    
-    # Initialize UI components
-    error_selector_ui = ErrorSelectorUI()
-    code_display_ui = CodeDisplayUI()
-    feedback_display_ui = FeedbackDisplayUI()
-    
-    # Header
-    st.title("Java Code Review Training System")
-    st.markdown("### Train your Java code review skills with AI-generated exercises")
-    
-    # Render sidebar
-    render_sidebar(llm_manager)
-    
-    # Display error message if there's an error
-    if st.session_state.error:
-        st.error(f"Error: {st.session_state.error}")
-        if st.button("Clear Error"):
-            st.session_state.error = None
-            st.rerun()
-    
-    # Create tabs for different steps of the workflow
-    tabs = st.tabs(["1. Generate Code Problem", "2. Submit Review", "3. Analysis & Feedback"])
-    
-    # Set the active tab based on session state
-    active_tab = st.session_state.active_tab
-    
-    with tabs[0]:
-        st.header("Generate Java Code Problem")
+    try:
+        print("Starting main function")
+        # Initialize session state
+        initialize_session()
         
-        col1, col2 = st.columns(2)
+        # Header
+        st.title("Java Code Review Training System")
+        st.markdown("### Train your Java code review skills with AI-generated exercises")
         
-        with col1:
-            # Fixed to Java
-            st.info("This system is specialized for Java code review training.")
+        # Render sidebar
+        render_sidebar()
+        
+        # Display error message if there's an error
+        if st.session_state.error:
+            st.error(f"Error: {st.session_state.error}")
+            if st.button("Clear Error", key="clear_error_button"):
+                st.session_state.error = None
+                st.rerun()
+        
+        # Create tabs for different steps of the workflow
+        tabs = st.tabs(["1. Generate Code Problem", "2. Submit Review", "3. Analysis & Feedback"])
+        
+        # Set the active tab based on session state
+        active_tab = st.session_state.active_tab
+        
+        with tabs[0]:
+            st.header("Generate Java Code Problem")
             
-            # Select error selection mode
-            mode = error_selector_ui.render_mode_selector()
+            # Render error selector
+            params = render_error_selector()
             
-            # Get code generation parameters
-            params = error_selector_ui.render_code_params()
+            # Generate button
+            generate_button = st.button("Generate Java Code Problem", type="primary", key="generate_button")
             
-        with col2:
-            # Show standard or advanced error selection based on mode
-            if mode == "standard":
-                # In standard mode, use simple problem area selection
-                problem_areas = error_selector_ui.render_simple_mode()
-                
-                # Map problem areas to categories for the backend
-                selected_categories = {
-                    "build": [],
-                    "checkstyle": []
-                }
-                
-                # Map problem areas to error categories
-                area_mapping = {
-                    "Style": {
-                        "build": [],
-                        "checkstyle": ["NamingConventionChecks", "WhitespaceAndFormattingChecks", "JavadocChecks"]
-                    },
-                    "Logical": {
-                        "build": ["LogicalErrors"],
-                        "checkstyle": []
-                    },
-                    "Performance": {
-                        "build": ["RuntimeErrors"],
-                        "checkstyle": ["MetricsChecks"]
-                    },
-                    "Security": {
-                        "build": ["RuntimeErrors", "LogicalErrors"],
-                        "checkstyle": ["CodeQualityChecks"]
-                    },
-                    "Design": {
-                        "build": ["LogicalErrors"],
-                        "checkstyle": ["MiscellaneousChecks", "FileStructureChecks", "BlockChecks"]
-                    }
-                }
-                
-                # Build selected categories from problem areas
-                for area in problem_areas:
-                    if area in area_mapping:
-                        mapping = area_mapping[area]
-                        for category in mapping["build"]:
-                            if category not in selected_categories["build"]:
-                                selected_categories["build"].append(category)
-                        for category in mapping["checkstyle"]:
-                            if category not in selected_categories["checkstyle"]:
-                                selected_categories["checkstyle"].append(category)
-            else:
-                # In advanced mode, let user select specific error categories
-                selected_categories = error_selector_ui.render_category_selection(
-                    agent_service.get_all_error_categories()
-                )
-        
-        # Generate button
-        generate_button = st.button("Generate Java Code Problem", type="primary")
-        
-        if generate_button:
-            with st.spinner("Generating Java code with intentional issues..."):
-                success = generate_code_problem(
-                    agent_service,
-                    params,
-                    selected_categories
-                )
-                
-                if success:
-                    st.rerun()
-        
-        # Display existing code if available
-        if st.session_state.code_snippet:
-            code_display_ui.render_code_display(
-                st.session_state.code_snippet,
-                st.session_state.known_problems
-            )
-    
-    with tabs[1]:
-        # Student review input and submission
-        if not st.session_state.code_snippet:
-            st.info("Please generate a code problem first in the 'Generate Code Problem' tab.")
-        else:
-            # Review display and submission
-            code_display_ui.render_code_display(st.session_state.code_snippet)
-            
-            # Submission callback
-            def handle_review_submission(student_review):
-                with st.spinner("Analyzing your review..."):
-                    success = process_student_review(agent_service, student_review)
+            if generate_button:
+                with st.spinner("Generating Java code with intentional issues..."):
+                    success = generate_code_problem(params)
+                    
                     if success:
                         st.rerun()
             
-            # Render review input with feedback
-            code_display_ui.render_review_input(
-                student_review=st.session_state.student_review,
-                on_submit_callback=handle_review_submission,
-                iteration_count=st.session_state.iteration_count,
-                max_iterations=st.session_state.max_iterations,
-                targeted_guidance=st.session_state.targeted_guidance,
-                review_analysis=st.session_state.review_analysis
-            )
-    
-    with tabs[2]:
-        st.header("Analysis & Feedback")
+            # Display existing code if available
+            if st.session_state.code_state and st.session_state.code_state.code_snippet:
+                render_code_display(
+                    st.session_state.code_state.code_snippet,
+                    st.session_state.code_state.known_problems
+                )
         
-        if not st.session_state.comparison_report and not st.session_state.review_summary:
-            st.info("Please submit your review in the 'Submit Review' tab first.")
-        else:
-            # Reset callback
-            def handle_reset():
-                agent_service.reset_session()
+        with tabs[1]:
+            # Student review input and submission
+            if not st.session_state.code_state or not st.session_state.code_state.code_snippet:
+                st.info("Please generate a code problem first in the 'Generate Code Problem' tab.")
+            else:
+                # Review display and submission
+                render_code_display(st.session_state.code_state.code_snippet)
                 
-                # Reset session state
-                for key in list(st.session_state.keys()):
-                    # Keep error selection mode and categories
-                    if key not in ["error_selection_mode", "selected_error_categories"]:
-                        del st.session_state[key]
-                
-                # Re-initialize session state
-                init_session_state()
-                
-                # Go back to the first tab
-                st.session_state.active_tab = 0
-                
-                # Rerun the app
-                st.rerun()
+                # Render review input
+                render_review_input(student_review=st.session_state.code_state.student_review)
+        
+        with tabs[2]:
+            st.header("Analysis & Feedback")
             
-            # Display feedback results
-            feedback_display_ui.render_results(
-                comparison_report=st.session_state.comparison_report,
-                review_summary=st.session_state.review_summary,
-                review_analysis=st.session_state.review_analysis,
-                review_history=st.session_state.review_history,
-                on_reset_callback=handle_reset
-            )
+            if not st.session_state.code_state or not st.session_state.code_state.comparison_report:
+                st.info("Please submit your review in the 'Submit Review' tab first.")
+            else:
+                # Display feedback results
+                render_results()
+                
+        print("Main function completed")
+    except Exception as e:
+        print(f"Error in main function: {str(e)}")
+        traceback.print_exc()
+        st.error(f"Application error: {str(e)}")
+        st.write("Please check the console logs for more details.")
+
+# Simple test function that can be used to verify Streamlit is working
+def test_function():
+    st.title("Simple Test App")
+    st.write("If you can see this, Streamlit is working properly.")
+    
+    if st.button("Click Me"):
+        st.success("Button clicked!")
 
 if __name__ == "__main__":
+    # Uncomment this line to run a simple test instead of the main application
+    # test_function()
+    
+    # Comment this line if running the test function
     main()
