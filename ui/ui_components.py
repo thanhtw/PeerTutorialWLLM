@@ -390,7 +390,7 @@ class CodeDisplayUI:
         if iteration_count > 1:
             st.markdown(
                 f"Submit Your Code Review "
-                f"<span class='iteration-badge'>Attempt {iteration_count} of "
+                f"<span  Detailed Comparison:  class='iteration-badge'>Attempt {iteration_count} of "
                 f"{max_iterations}</span>", 
                 unsafe_allow_html=True
             )
@@ -479,7 +479,7 @@ class FeedbackDisplayUI:
         if comparison_report:
             st.subheader("Educational Feedback:")
             st.markdown(
-                f'<div class="comparison-report">{comparison_report}</div>',
+                f'<div style="background-color:#181c21" class="comparison-report">{comparison_report}</div>',
                 unsafe_allow_html=True
             )
         
@@ -493,7 +493,7 @@ class FeedbackDisplayUI:
                     iteration = review.get("iteration_number", 0)
                     
                     st.markdown(
-                        f'<div class="review-history-item">'
+                        f'<div style="background-color:#181c21" class="review-history-item">'
                         f'<h4>Attempt {iteration}</h4>'
                         f'<p>Found {review_analysis.get("identified_count", 0)} of '
                         f'{review_analysis.get("total_problems", 0)} issues '

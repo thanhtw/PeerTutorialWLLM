@@ -417,7 +417,6 @@ class AgentService:
                         - Ensure it's recognizable to a student with beginner to intermediate Java knowledge
                         - Add brief comments nearby (using // Comment format) that hint at the error without directly stating it
                         4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
-
                         I'll now create the Java code with the required errors: """
 
         else:      
@@ -438,8 +437,10 @@ class AgentService:
                 - Ensure it's recognizable to a student with beginner to intermediate Java knowledge
                 - Add brief comments nearby (using // Comment format) that hint at the error without directly stating it
                 4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
+                5. note of  code must write in traditional chinese
 
                 Return ONLY the Java code with the errors included. Do not include any explanations or JSON formatting.
+                All comments, hints and documentation text in the code should be in Traditional Chinese (繁體中文).
                 """
                 
         return prompt
