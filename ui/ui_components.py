@@ -288,8 +288,11 @@ class CodeDisplayUI:
         
         st.subheader("Java Code to Review:")
         
+        # Clean the code by removing TODO comments and other error hints
+        clean_code = self._clean_code_for_display(code_snippet)
+        
         # Add line numbers to the code snippet
-        numbered_code = self._add_line_numbers(code_snippet)
+        numbered_code = self._add_line_numbers(clean_code)
         st.code(numbered_code, language="java")
         
         # INSTRUCTOR VIEW: Show known problems if provided
@@ -299,6 +302,50 @@ class CodeDisplayUI:
                 for i, problem in enumerate(known_problems, 1):
                     st.markdown(f"{i}. {problem}")
     
+    def _clean_code_for_display(self, code_text: str) -> str:
+        """
+        Clean code for display by removing TODO comments and other error hints.
+        
+        Args:
+            code_text: Raw code text that might contain comments and hints
+            
+        Returns:
+            Clean code without error-related comments
+        """
+        # Split code into lines
+        lines = code_text.splitlines()
+        
+        # Filter out lines with specific patterns
+        filtered_lines = []
+        skip_next = False
+        for line in lines:
+            # Skip lines with TODO comments
+            if "TODO: Fix" in line:
+                continue
+                
+            # Skip comment lines that directly follow a TODO comment (explanations)
+            if skip_next and line.strip().startswith("*") and not line.strip().startswith("*/"):
+                skip_next = False
+                continue
+                
+            # Set flag to skip the next line if it might be an explanation
+            if "TODO: Fix" in line:
+                skip_next = True
+            else:
+                skip_next = False
+            
+            # Skip other error hint patterns
+            if any(hint in line for hint in [
+                "// Error:", "// Bug:", "// Issue:", "// Problem:", 
+                "// Intentional error", "// For review:", "// FIXME:"
+            ]):
+                continue
+                
+            filtered_lines.append(line)
+        
+        # Join lines back into a single string
+        return "\n".join(filtered_lines)
+
     def _add_line_numbers(self, code: str) -> str:
         """
         Add line numbers to code snippet.
@@ -341,7 +388,7 @@ class CodeDisplayUI:
         """
         # Show iteration badge if not the first iteration
         if iteration_count > 1:
-            st.header(
+            st.markdown(
                 f"Submit Your Code Review "
                 f"<span class='iteration-badge'>Attempt {iteration_count} of "
                 f"{max_iterations}</span>", 

@@ -513,7 +513,7 @@ def main():
                     st.rerun()
         
         # Display existing code if available
-        state = st.session_state.workflow_state
+        state = st.session_state.workflow_state        
         if state.code_snippet:
             code_display_ui.render_code_display(
                 state.code_snippet.code,

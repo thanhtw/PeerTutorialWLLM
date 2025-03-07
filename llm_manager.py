@@ -202,7 +202,7 @@ class LLMManager:
         if model_name in self.initialized_models:
             logger.info(f"Using cached model: {model_name}")
             return self.initialized_models[model_name]
-            
+                
         # Apply default model parameters if none provided
         if model_params is None:
             model_params = self._get_default_params(model_name)
@@ -218,18 +218,31 @@ class LLMManager:
                     logger.error(f"Failed to pull model {model_name}")
                     return None
             
-            # Initialize Ollama model
+            # Initialize Ollama model with parameters
             temperature = model_params.get("temperature", 0.7)
+            
+            # Extract additional parameters
+            additional_params = {k: v for k, v in model_params.items() if k != "temperature"}
             
             llm = Ollama(
                 base_url=self.ollama_base_url,
                 model=model_name,
-                temperature=temperature
+                temperature=temperature,
+                **additional_params
             )
+            
+            # Check if reasoning mode is enabled
+            reasoning_mode = os.getenv("REASONING_MODE", "false").lower() == "true"
             
             # Test the model with a simple query
             try:
-                _ = llm.invoke("hello")
+                if reasoning_mode:
+                    # For reasoning mode, use a test prompt that encourages reasoning
+                    test_prompt = "Let's think step by step: What is 2+2?"
+                    _ = llm.invoke(test_prompt)
+                else:
+                    _ = llm.invoke("hello")
+                    
                 # If successful, cache the model
                 self.initialized_models[model_name] = llm
                 logger.info(f"Successfully initialized model {model_name}")
@@ -237,7 +250,7 @@ class LLMManager:
             except Exception as e:
                 logger.error(f"Error testing model {model_name}: {str(e)}")
                 return None
-                
+                    
         except Exception as e:
             logger.error(f"Error initializing model {model_name}: {str(e)}")
             return None
@@ -256,9 +269,29 @@ class LLMManager:
         model_name = os.getenv(model_key, self.default_model)
         temperature = float(os.getenv(temperature_key, "0.7"))
         
+        # Check if reasoning mode is enabled
+        reasoning_mode = os.getenv("REASONING_MODE", "false").lower() == "true"
+        
         model_params = {
             "temperature": temperature
         }
+        
+        # If reasoning mode is enabled, add specific parameters for reasoning
+        if reasoning_mode:
+            # Override temperature with reasoning temperature if specified
+            reasoning_temp = os.getenv("REASONING_TEMPERATURE")
+            if reasoning_temp:
+                model_params["temperature"] = float(reasoning_temp)
+            
+            # Add other reasoning-specific parameters
+            model_params["max_tokens"] = 1024  # Increase token limit for more detailed reasoning
+            
+            # Modify the model name to use a larger model if available
+            if "1b" in model_name:  # If using 1B model, try to use 8B if available
+                larger_model = model_name.replace("1b", "8b")
+                if self.check_model_availability(larger_model):
+                    model_name = larger_model
+                    logger.info(f"Reasoning mode: Upgraded to {model_name}")
         
         return self.initialize_model(model_name, model_params)
     

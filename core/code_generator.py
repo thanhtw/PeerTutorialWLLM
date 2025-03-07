@@ -355,18 +355,10 @@ public class {class_name} {{
                 ])
                 body = self._generate_method_body(return_type, "hard")
             
-            # Add javadoc
-    #         javadoc = f"""/**
-    #  * {prefix.capitalize()}s the {suffix.lower()} based on the provided parameters.
-    #  *
-    #  * @param {params.replace(', ', '\n     * @param ')}
-    #  * @return {return_type} {self._generate_return_description(return_type)}
-    #  */"""
-            
-            method = f"""{javadoc}
-    public {return_type} {method_name}({params}) {{
-{body}
-    }}"""
+            # Create method without Javadoc comments
+            method = f"""    public {return_type} {method_name}({params}) {{
+    {body}
+        }}"""
             
             methods.append(method)
         

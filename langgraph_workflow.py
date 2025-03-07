@@ -120,7 +120,7 @@ class JavaCodeReviewGraph:
                 difficulty_level=difficulty_level,
                 selected_errors=errors
             )
-            
+                        
             # Create problem descriptions
             for error_type, error_list in errors.items():
                 for error in error_list:
@@ -313,7 +313,7 @@ class JavaCodeReviewGraph:
             code_length=code_length,
             difficulty_level=difficulty_level
         )
-        
+
         return self._add_error_comments(base_code, flat_errors)
     
     def _create_code_generation_prompt(self, code_length: str, difficulty_level: str, selected_errors: List[Dict[str, Any]]) -> str:
