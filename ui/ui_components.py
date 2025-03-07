@@ -52,7 +52,7 @@ class ErrorSelectorUI:
             Dictionary with selected categories
         """
         st.subheader("Select Specific Error Categories")
-        st.info("Choose specific error categories to include in the generated Java code.")
+        #st.info("Choose specific error categories to include in the generated Java code.")
         
         # Add CSS for nested subcategory display
         st.markdown("""
@@ -75,7 +75,7 @@ class ErrorSelectorUI:
                 border-radius: 5px;
             }
             .error-type-header {
-                background-color: #f1f8ff;
+                background-color: #4658b5;
                 padding: 10px;
                 border-radius: 5px;
                 margin: 10px 0;
@@ -400,7 +400,7 @@ class CodeDisplayUI:
         # Display targeted guidance if available (for iterations after the first)
         if targeted_guidance and iteration_count > 1:
             st.markdown(
-                f'<div class="guidance-box">'
+                f'<div style="background-color:#181c21" class="guidance-box">'
                 f'<h4>Review Guidance</h4>'
                 f'{targeted_guidance}'
                 f'</div>',
@@ -410,7 +410,7 @@ class CodeDisplayUI:
             # Show previous attempt results if available
             if review_analysis:
                 st.markdown(
-                    f'<div class="warning-box">'
+                    f'<div style="background-color:#181c21" class="warning-box">'
                     f'<h4>Previous Attempt Results</h4>'
                     f'You identified {review_analysis.get("identified_count", 0)} of '
                     f'{review_analysis.get("total_problems", 0)} issues '
