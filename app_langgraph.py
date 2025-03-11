@@ -280,6 +280,10 @@ def process_student_review(workflow: JavaCodeReviewGraph, student_review: str):
         # Get current state
         state = st.session_state.workflow_state
         
+        # Store the current review in session state for display consistency
+        current_iteration = state.current_iteration
+        st.session_state[f"submitted_review_{current_iteration}"] = student_review
+        
         # Submit the review and update the state
         status_text.text("Analyzing your review...")
         progress_bar.progress(50)
@@ -314,6 +318,9 @@ def process_student_review(workflow: JavaCodeReviewGraph, student_review: str):
         # Clear progress indicators
         progress_bar.empty()
         status_text.empty()
+        
+        # Force a rerun to update the UI
+        st.rerun()
         
         return True
         

@@ -1,11 +1,3 @@
-"""
-LLM Manager for Peer Review Agent.
-
-This module handles LLM initialization, configuration, and management
-for the peer code review agent, providing a unified interface to interact
-with Ollama models.
-"""
-
 import os
 import requests
 import time
@@ -224,6 +216,11 @@ class LLMManager:
             # Extract additional parameters
             additional_params = {k: v for k, v in model_params.items() if k != "temperature"}
             
+            # Remove potentially problematic parameters (max_tokens)
+            if "max_tokens" in additional_params:
+                logger.info(f"Removing max_tokens parameter to avoid Ollama validation error")
+                del additional_params["max_tokens"]
+            
             llm = Ollama(
                 base_url=self.ollama_base_url,
                 model=model_name,
@@ -283,9 +280,6 @@ class LLMManager:
             if reasoning_temp:
                 model_params["temperature"] = float(reasoning_temp)
             
-            # Add other reasoning-specific parameters
-            model_params["max_tokens"] = 1024  # Increase token limit for more detailed reasoning
-            
             # Modify the model name to use a larger model if available
             if "1b" in model_name:  # If using 1B model, try to use 8B if available
                 larger_model = model_name.replace("1b", "8b")
@@ -305,17 +299,17 @@ class LLMManager:
         Returns:
             Dict[str, Any]: Default parameters for the model
         """
-        # Basic defaults
+        # Basic defaults - REMOVED max_tokens to avoid validation errors
         params = {
             "temperature": 0.7,
-            "max_tokens": 512
+            # Removed max_tokens parameter - caused validation errors with some Ollama versions
         }
         
         # Adjust based on model name
         if "generative" in model_name or any(gen in model_name for gen in ["llama3", "llama-3"]):
             params["temperature"] = 0.8  # Slightly higher creativity for generative tasks
             
-        elif "review" in model_name or any(rev in model_name for rev in ["mistral", "deepseek"]):
+        elif "review" in model_name or any(rev in model_name for gen in ["mistral", "deepseek"]):
             params["temperature"] = 0.3  # Lower temperature for review tasks
             
         elif "summary" in model_name:

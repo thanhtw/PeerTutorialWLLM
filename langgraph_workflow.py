@@ -225,7 +225,7 @@ class JavaCodeReviewGraph:
             if not state.review_history:
                 state.error = "No reviews available for summary"
                 return state
-                
+                    
             # Generate feedback using the feedback manager
             all_reviews = [review.student_review for review in state.review_history]
             all_analyses = [review.analysis for review in state.review_history]
@@ -247,7 +247,9 @@ class JavaCodeReviewGraph:
             
             # Generate final feedback and comparison report
             final_feedback = self.feedback_manager.generate_final_feedback()
-            comparison_report = self._generate_comparison_report(
+            
+            # Safe version of comparison report generation
+            comparison_report = self._safe_generate_comparison_report(
                 state.code_snippet.known_problems,
                 state.review_history[-1].analysis if state.review_history else {}
             )
@@ -258,12 +260,101 @@ class JavaCodeReviewGraph:
             state.current_step = "complete"
             
             return state
-            
+                
         except Exception as e:
             logger.error(f"Error generating summary: {str(e)}")
             state.error = f"Error generating summary: {str(e)}"
             return state
     
+    def _safe_generate_comparison_report(self, known_problems: List[str], review_analysis: Dict[str, Any]) -> str:
+        """
+        Safely generate a comparison report between student review and known problems.
+        Handles type checking to prevent errors.
+        
+        Args:
+            known_problems: List of known problems
+            review_analysis: Analysis of the student review
+            
+        Returns:
+            Comparison report text
+        """
+        try:
+            # Create report header
+            report = "# Detailed Comparison: Your Review vs. Actual Issues\n\n"
+            
+            # Problems section
+            report += "## Code Issues Analysis\n\n"
+            
+            # Safely extract data from review analysis
+            identified_problems = review_analysis.get("identified_problems", [])
+            missed_problems = review_analysis.get("missed_problems", [])
+            false_positives = review_analysis.get("false_positives", [])
+            
+            # Ensure all problems are properly converted to strings
+            known_problems_str = [str(p) if not isinstance(p, str) else p for p in known_problems]
+            identified_problems_str = [str(p) if not isinstance(p, str) else p for p in identified_problems]
+            missed_problems_str = [str(p) if not isinstance(p, str) else p for p in missed_problems]
+            false_positives_str = [str(p) if not isinstance(p, str) else p for p in false_positives]
+            
+            # Issues found correctly
+            if identified_problems_str:
+                report += "### Issues You Identified Correctly\n\n"
+                for i, problem in enumerate(identified_problems_str, 1):
+                    report += f"**{i}. {problem}**\n\n"
+                    report += "Great job finding this issue! "
+                    report += "This demonstrates your understanding of this type of problem.\n\n"
+            
+            # Issues missed
+            if missed_problems_str:
+                report += "### Issues You Missed\n\n"
+                for i, problem in enumerate(missed_problems_str, 1):
+                    report += f"**{i}. {problem}**\n\n"
+                    report += "You didn't identify this issue. "
+                    
+                    # Add some specific guidance based on the problem type
+                    problem_lower = problem.lower()
+                    if "null" in problem_lower:
+                        report += "When reviewing code, always check for potential null references and proper null handling.\n\n"
+                    elif "naming" in problem_lower or "convention" in problem_lower:
+                        report += "Pay attention to naming conventions in Java. Classes should use UpperCamelCase, while methods and variables should use lowerCamelCase.\n\n"
+                    elif "javadoc" in problem_lower or "comment" in problem_lower:
+                        report += "Remember to check for proper documentation. Methods should have complete Javadoc comments with @param and @return tags where appropriate.\n\n"
+                    elif "exception" in problem_lower or "throw" in problem_lower:
+                        report += "Always verify that exceptions are either caught or declared in the method signature with 'throws'.\n\n"
+                    elif "loop" in problem_lower or "condition" in problem_lower:
+                        report += "Carefully examine loop conditions for off-by-one errors or potential infinite loops.\n\n"
+                    else:
+                        report += "This is something to look for in future code reviews.\n\n"
+            
+            # Calculate some metrics
+            total_problems = len(known_problems_str)
+            identified_count = len(identified_problems_str)
+            missed_count = len(missed_problems_str)
+            false_positive_count = len(false_positives_str)
+            
+            accuracy = (identified_count / total_problems * 100) if total_problems > 0 else 0
+            
+            # Overall assessment
+            report += "### Overall Assessment\n\n"
+            
+            if accuracy >= 80:
+                report += "**Excellent review!** You found most of the issues in the code.\n\n"
+            elif accuracy >= 60:
+                report += "**Good review.** You found many issues, but missed some important ones.\n\n"
+            elif accuracy >= 40:
+                report += "**Fair review.** You found some issues, but missed many important ones.\n\n"
+            else:
+                report += "**Needs improvement.** You missed most of the issues in the code.\n\n"
+            
+            report += f"- You identified {identified_count} out of {total_problems} issues ({accuracy:.1f}%)\n"
+            report += f"- You missed {missed_count} issues\n"
+            report += f"- You incorrectly identified {false_positive_count} non-issues\n\n"
+            
+            return report
+        
+        except Exception as e:
+            logger.error(f"Error generating comparison report: {str(e)}")
+            return "Error generating comparison report. Your review was processed, but we couldn't generate a detailed comparison."
     # Conditional edge implementations
     def should_continue_review(self, state: WorkflowState) -> str:
         """

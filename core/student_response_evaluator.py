@@ -55,10 +55,10 @@ class StudentResponseEvaluator:
         Returns:
             Dictionary with analysis results
         """
-        if self.llm:
-            return self._evaluate_with_llm(code_snippet, known_problems, student_review)
-        else:
-            return self._evaluate_programmatically(code_snippet, known_problems, student_review)
+        #if self.llm:
+        return self._evaluate_with_llm(code_snippet, known_problems, student_review)
+        # else:
+        #     return self._evaluate_programmatically(code_snippet, known_problems, student_review)
     
     def _evaluate_with_llm(self, 
                           code_snippet: str,
@@ -85,7 +85,9 @@ class StudentResponseEvaluator:
 2. Return your analysis in valid JSON format with proper escaping
 3. Provide constructive feedback that helps students improve
 4. Be precise in identifying which problems were found and which were missed
-5. Format your response as proper JSON"""
+5. Format your response as proper JSON
+6. Written entirely in Traditional Chinese (繁體中文)
+"""
         
         prompt = f"""
 Please analyze how well the student's review identifies the known problems in the code.
@@ -348,15 +350,28 @@ Be specific in your feedback about what types of issues they missed and how they
         for sentence in review_sentences:
             # If it looks like a problem statement
             if any(indicator in sentence.lower() for indicator in ["error", "issue", "problem", "bug", "incorrect"]):
-                is_known = False
+                is_known = False               
+                # For each known problem, check if it was identified
                 for problem in known_problems:
-                    problem_lower = problem.lower()
-                    key_terms = self._extract_key_terms(problem_lower)
-                    matched_terms = [term for term in key_terms if term in sentence.lower()]
+                    # Ensure problem is a string
+                    problem_str = str(problem) if not isinstance(problem, str) else problem
+                    problem_lower = problem_str.lower()
                     
-                    if len(matched_terms) >= max(2, len(key_terms) // 2):
-                        is_known = True
-                        break
+                    # Check direct matches with key terms from the problem
+                    key_terms = self._extract_key_terms(problem_lower)
+                    direct_match = False
+                    
+                    for sentence in review_sentences:
+                        sentence_lower = sentence.lower()
+                        matched_terms = [term for term in key_terms if term in sentence_lower]
+                        
+                        # If we match enough terms, consider it identified
+                        if len(matched_terms) >= max(2, len(key_terms) // 2):
+                            identified_problems.append(problem_str)
+                            direct_match = True
+                            break
+                    if not direct_match:
+                        missed_problems.append(problem_str)
                 
                 if not is_known:
                     # Likely a false positive
@@ -484,11 +499,13 @@ Be specific in your feedback about what types of issues they missed and how they
         Returns:
             List of problem categories
         """
-        categories = set()
+        categories = set()        
         
         for problem in problems:
-            problem_lower = problem.lower()
-            
+        # Ensure problem is a string
+            problem_str = str(problem) if not isinstance(problem, str) else problem
+            problem_lower = problem_str.lower()
+        
             if any(term in problem_lower for term in ["nullpointer", "null pointer", "null reference"]):
                 categories.add("null pointer issues")
             elif any(term in problem_lower for term in ["array", "index", "bounds"]):
@@ -590,7 +607,8 @@ Your guidance is:
 2. Specific and actionable
 3. Educational - teaching students how to find issues rather than just telling them what to find
 4. Focused on developing their review skills
-5. Balanced - acknowledging what they did well while guiding them to improve"""
+5. Balanced - acknowledging what they did well while guiding them to improve
+6. Written entirely in Traditional Chinese (繁體中文)"""
         
         prompt = f"""
 Please create targeted guidance for a student who has reviewed Java code but missed some important errors.

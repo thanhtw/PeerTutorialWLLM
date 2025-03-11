@@ -176,6 +176,7 @@ Requirements:
 - Follow standard Java naming conventions and best practices
 - Make the code realistic and representative of real-world Java applications
 - Do NOT include any intentional errors or problems
+- Written entirely in Traditional Chinese (繁體中文)
 
 Return only the Java code with no additional explanations.
 ```java

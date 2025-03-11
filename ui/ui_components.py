@@ -390,7 +390,7 @@ class CodeDisplayUI:
         if iteration_count > 1:
             st.markdown(
                 f"Submit Your Code Review "
-                f"<span  Detailed Comparison:  class='iteration-badge'>Attempt {iteration_count} of "
+                f"<span class='iteration-badge'>Attempt {iteration_count} of "
                 f"{max_iterations}</span>", 
                 unsafe_allow_html=True
             )
@@ -400,7 +400,7 @@ class CodeDisplayUI:
         # Display targeted guidance if available (for iterations after the first)
         if targeted_guidance and iteration_count > 1:
             st.markdown(
-                f'<div style="background-color:#181c21" class="guidance-box">'
+                f'<div class="guidance-box">'
                 f'<h4>Review Guidance</h4>'
                 f'{targeted_guidance}'
                 f'</div>',
@@ -410,7 +410,7 @@ class CodeDisplayUI:
             # Show previous attempt results if available
             if review_analysis:
                 st.markdown(
-                    f'<div style="background-color:#181c21" class="warning-box">'
+                    f'<div class="warning-box">'
                     f'<h4>Previous Attempt Results</h4>'
                     f'You identified {review_analysis.get("identified_count", 0)} of '
                     f'{review_analysis.get("total_problems", 0)} issues '
@@ -420,16 +420,32 @@ class CodeDisplayUI:
                     unsafe_allow_html=True
                 )
         
+        # Display previous review if available
+        if student_review and iteration_count > 1:
+            with st.expander("Your Previous Review", expanded=False):
+                st.markdown(f"```\n{student_review}\n```")
+        
         st.subheader("Your Review:")
         st.write("Please review the code above and identify any issues or problems:")
         
         # Create a unique key for the text area
         text_area_key = f"student_review_input_{iteration_count}"
         
+        # Initialize with previous review text only on first load of this iteration
+        initial_value = ""
+        if iteration_count == 1 or not student_review:
+            initial_value = ""  # Start fresh for first iteration or if no previous review
+        else:
+            # For subsequent iterations, preserve existing input in session state if any
+            if text_area_key in st.session_state:
+                initial_value = st.session_state[text_area_key]
+            else:
+                initial_value = ""  # Start fresh in new iterations
+        
         # Get or update the student review
         student_review_input = st.text_area(
             "Enter your review comments here",
-            value=student_review,
+            value=initial_value, 
             height=200,
             key=text_area_key
         )
@@ -441,7 +457,12 @@ class CodeDisplayUI:
             if not student_review_input.strip():
                 st.warning("Please enter your review before submitting.")
             elif on_submit_callback:
-                on_submit_callback(student_review_input)
+                with st.spinner("Processing your review..."):
+                    on_submit_callback(student_review_input)
+                    
+                    # Store the submitted review in session state for this iteration
+                    if f"submitted_review_{iteration_count}" not in st.session_state:
+                        st.session_state[f"submitted_review_{iteration_count}"] = student_review_input
 
 class FeedbackDisplayUI:
     """
@@ -456,13 +477,13 @@ class FeedbackDisplayUI:
         pass
     
     def render_results(self, 
-                      comparison_report: str = None,
-                      review_summary: str = None,
-                      review_analysis: Dict[str, Any] = None,
-                      review_history: List[Dict[str, Any]] = None,
-                      on_reset_callback: Callable[[], None] = None) -> None:
+                  comparison_report: str = None,
+                  review_summary: str = None,
+                  review_analysis: Dict[str, Any] = None,
+                  review_history: List[Dict[str, Any]] = None,
+                  on_reset_callback: Callable[[], None] = None) -> None:
         """
-        Render the analysis results and feedback.
+        Render the analysis results and feedback with improved review visibility.
         
         Args:
             comparison_report: Comparison report text
@@ -479,32 +500,49 @@ class FeedbackDisplayUI:
         if comparison_report:
             st.subheader("Educational Feedback:")
             st.markdown(
-                f'<div style="background-color:#181c21" class="comparison-report">{comparison_report}</div>',
+                f'<div class="comparison-report">{comparison_report}</div>',
                 unsafe_allow_html=True
             )
         
-        # Show review history in an expander if there are multiple iterations
-        if review_history and len(review_history) > 1:
-            with st.expander("Review History", expanded=False):
-                st.write("Your review attempts:")
+        # Always show review history for better visibility
+        if review_history and len(review_history) > 0:
+            st.subheader("Your Review:")
+            
+            # First show the most recent review prominently
+            if review_history:
+                latest_review = review_history[-1]
+                review_analysis = latest_review.get("review_analysis", {})
+                iteration = latest_review.get("iteration_number", 0)
                 
-                for review in review_history:
-                    review_analysis = review.get("review_analysis", {})
-                    iteration = review.get("iteration_number", 0)
+                st.markdown(f"#### Your Final Review (Attempt {iteration})")
+                st.markdown("```\n" + latest_review.get("student_review", "") + "\n```")
+                
+                st.markdown(f"**Found:** {review_analysis.get('identified_count', 0)} of "
+                        f"{review_analysis.get('total_problems', 0)} issues "
+                        f"({review_analysis.get('accuracy_percentage', 0):.1f}% accuracy)")
+            
+            # Show earlier reviews in an expander if there are multiple
+            if len(review_history) > 1:
+                with st.expander("Review History", expanded=False):
+                    st.write("Your previous review attempts:")
                     
-                    st.markdown(
-                        f'<div style="background-color:#181c21" class="review-history-item">'
-                        f'<h4>Attempt {iteration}</h4>'
-                        f'<p>Found {review_analysis.get("identified_count", 0)} of '
-                        f'{review_analysis.get("total_problems", 0)} issues '
-                        f'({review_analysis.get("accuracy_percentage", 0):.1f}% accuracy)</p>'
-                        f'<details>'
-                        f'<summary>View this review</summary>'
-                        f'<pre>{review.get("student_review", "")}</pre>'
-                        f'</details>'
-                        f'</div>',
-                        unsafe_allow_html=True
-                    )
+                    for review in review_history[:-1]:  # Skip the latest which we showed above
+                        review_analysis = review.get("review_analysis", {})
+                        iteration = review.get("iteration_number", 0)
+                        
+                        st.markdown(
+                            f'<div class="review-history-item">'
+                            f'<h4>Attempt {iteration}</h4>'
+                            f'<p>Found {review_analysis.get("identified_count", 0)} of '
+                            f'{review_analysis.get("total_problems", 0)} issues '
+                            f'({review_analysis.get("accuracy_percentage", 0):.1f}% accuracy)</p>'
+                            f'<details>'
+                            f'<summary>View this review</summary>'
+                            f'<pre>{review.get("student_review", "")}</pre>'
+                            f'</details>'
+                            f'</div>',
+                            unsafe_allow_html=True
+                        )
         
         # Display analysis details in an expander
         if review_summary or review_analysis:
@@ -527,19 +565,33 @@ class FeedbackDisplayUI:
                     
                     with col1:
                         st.write("**Correctly Identified Issues:**")
-                        for issue in review_analysis.get("identified_problems", []):
-                            st.write(f"✓ {issue}")
+                        identified_problems = review_analysis.get("identified_problems", [])
+                        if identified_problems:
+                            for issue in identified_problems:
+                                # Convert to string if needed
+                                issue_str = str(issue) if not isinstance(issue, str) else issue
+                                st.write(f"✓ {issue_str}")
+                        else:
+                            st.write("None")
                     
                     with col2:
                         st.write("**Missed Issues:**")
-                        for issue in review_analysis.get("missed_problems", []):
-                            st.write(f"✗ {issue}")
+                        missed_problems = review_analysis.get("missed_problems", [])
+                        if missed_problems:
+                            for issue in missed_problems:
+                                # Convert to string if needed
+                                issue_str = str(issue) if not isinstance(issue, str) else issue
+                                st.write(f"✗ {issue_str}")
+                        else:
+                            st.write("None")
                     
                     # Display false positives if any
                     if review_analysis.get("false_positives"):
                         st.write("**False Positives:**")
                         for issue in review_analysis.get("false_positives"):
-                            st.write(f"⚠ {issue}")
+                            # Convert to string if needed
+                            issue_str = str(issue) if not isinstance(issue, str) else issue
+                            st.write(f"⚠ {issue_str}")
         
         # Start over button
         if st.button("Start New Review", type="primary"):
