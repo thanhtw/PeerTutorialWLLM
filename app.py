@@ -391,64 +391,160 @@ def render_sidebar(llm_manager: LLMManager, workflow: JavaCodeReviewGraph):
                 st.info("Model selections changed. Reinitializing models...")
 
 def render_status_sidebar(llm_manager: LLMManager):
-    """Render the status sidebar tab"""
+    """Render the status sidebar tab with a more user-friendly interface"""
     st.header("System Status")
-    
-    # Create a status card
-    #st.markdown('<div class="card">', unsafe_allow_html=True)
     
     # Check Ollama status
     status = check_ollama_status(llm_manager)
     
+    # Status indicators with better styling
+    st.markdown("""
+        <style>
+            .status-container {
+                background-color: #f8f9fa;
+                border-radius: 8px;
+                padding: 12px;
+                margin-bottom: 15px;
+            }
+            .status-item {
+                display: flex;
+                align-items: center;
+                margin-bottom: 10px;
+            }
+            .status-text {
+                margin-left: 10px;
+                flex-grow: 1;
+            }
+            .status-badge {
+                padding: 3px 8px;
+                border-radius: 12px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            .badge-ok {
+                background-color: #d4edda;
+                color: #155724;
+            }
+            .badge-error {
+                background-color: #f8d7da;
+                color: #721c24;
+            }
+            .badge-warning {
+                background-color: #fff3cd;
+                color: #856404;
+            }
+            .about-box {
+                background-color: #e6f3ff;
+                border-radius: 8px;
+                padding: 15px;
+                margin-top: 20px;
+            }
+        </style>
+        <div class="status-container">
+    """, unsafe_allow_html=True)
+    
+    # Ollama status with icon
     if status["ollama_running"]:
-        st.markdown(f"- Ollama: <span class='status-ok'> Running</span>", unsafe_allow_html=True)
+        st.markdown(
+            '<div class="status-item">'
+            '<span>🟢</span>'
+            '<div class="status-text">Ollama</div>'
+            '<span class="status-badge badge-ok">Running</span>'
+            '</div>',
+            unsafe_allow_html=True
+        )
     else:
-        st.markdown(f"- Ollama: <span class='status-error'> Not Running</span>", unsafe_allow_html=True)
+        st.markdown(
+            '<div class="status-item">'
+            '<span>🔴</span>'
+            '<div class="status-text">Ollama</div>'
+            '<span class="status-badge badge-error">Not Running</span>'
+            '</div>',
+            unsafe_allow_html=True
+        )
         
-        # Troubleshooting information
-        with st.expander("Troubleshooting"):
-            st.markdown("""
-            1. **Check if Ollama is running:**
-               ```bash
-               curl http://localhost:11434/api/tags
-               ```
-               
-            2. **Make sure Ollama is started:**
-               - On Linux/Mac: `ollama serve`
-               - On Windows: Start the Ollama application
+        # Simple troubleshooting button
+        if st.button("👨‍💻 Troubleshooting Tips", key="troubleshoot_btn"):
+            st.info("""
+            **Quick Fix:**
+            - Make sure Ollama is installed
+            - Start Ollama with `ollama serve` in terminal
+            - Windows users: Launch the Ollama application
             """)
     
+    # Default model status
     if status["default_model_available"]:
-        st.markdown(f"- Default model: <span class='status-ok'>Available</span>", unsafe_allow_html=True)
+        st.markdown(
+            '<div class="status-item">'
+            '<span>🟢</span>'
+            '<div class="status-text">Default Model</div>'
+            '<span class="status-badge badge-ok">Available</span>'
+            '</div>',
+            unsafe_allow_html=True
+        )
     else:
-        st.markdown(f"- Default model: <span class='status-warning'>� Not Found</span>", unsafe_allow_html=True)
+        st.markdown(
+            '<div class="status-item">'
+            '<span>🟠</span>'
+            '<div class="status-text">Default Model</div>'
+            '<span class="status-badge badge-warning">Not Found</span>'
+            '</div>',
+            unsafe_allow_html=True
+        )
+        
+        # Download button only if Ollama is running
         if status["ollama_running"]:
-            if st.button("Pull Default Model", key="pull_default_btn"):
-                with st.spinner(f"Pulling {llm_manager.default_model}..."):
+            if st.button("⬇️ Download Model", key="pull_default_btn"):
+                with st.spinner(f"Downloading {llm_manager.default_model}..."):
                     if llm_manager.download_ollama_model(llm_manager.default_model):
-                        st.success("Default model pulled successfully!")
+                        st.success("Model downloaded successfully!")
                         st.rerun()
                     else:
-                        st.error("Failed to pull default model.")
+                        st.error("Download failed.")
     
+    # Model configuration status
     if status["all_models_configured"]:
-        st.markdown(f"- Model configuration: <span class='status-ok'> Complete</span>", unsafe_allow_html=True)
+        st.markdown(
+            '<div class="status-item">'
+            '<span>🟢</span>'
+            '<div class="status-text">Configuration</div>'
+            '<span class="status-badge badge-ok">Complete</span>'
+            '</div>',
+            unsafe_allow_html=True
+        )
     else:
-        st.markdown(f"- Model configuration: <span class='status-warning'>� Incomplete</span>", unsafe_allow_html=True)
+        st.markdown(
+            '<div class="status-item">'
+            '<span>🟠</span>'
+            '<div class="status-text">Configuration</div>'
+            '<span class="status-badge badge-warning">Incomplete</span>'
+            '</div>',
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            '<div style="font-size: 12px; margin-left: 25px; color: #666;">'
+            'Go to the "Models" tab to configure'
+            '</div>',
+            unsafe_allow_html=True
+        )
     
+    # Close the status container
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Application info
-    st.subheader("About")
-    st.markdown("""
-    This application helps you practice code review skills by:
-    
-    1. Generating Java code with intentional errors
-    2. Letting you identify those errors
-    3. Providing feedback on your review accuracy
-    
-    The system uses Ollama to run LLMs locally.
-    """)
+    # About section with better styling
+    st.markdown(
+        '<div class="about-box">'
+        '<h3>📚 How This App Works</h3>'
+        '<p>Practice Java code review in 3 simple steps:</p>'
+        '<ol>'
+        '<li>💻 Generate Java code with intentional errors</li>'
+        '<li>🔍 Find and identify the issues in the code</li>'
+        '<li>📊 Get feedback on your review accuracy</li>'
+        '</ol>'
+        '<p>Click "Generate Problem" to start practicing!</p>'
+        '</div>',
+        unsafe_allow_html=True
+    )
 
 def render_settings_sidebar(workflow: JavaCodeReviewGraph):
     """Render the settings sidebar tab"""
