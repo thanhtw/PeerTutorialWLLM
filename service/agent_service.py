@@ -156,6 +156,9 @@ class AgentService:
                     "checkstyle": ["NamingConventionChecks", "WhitespaceAndFormattingChecks", "JavadocChecks"]
                 }
             
+            # Ensure difficulty_level is a string
+            difficulty_level_str = str(difficulty_level) if not isinstance(difficulty_level, str) else difficulty_level
+            
             # Directly select specific errors from the JSON files
             selected_errors = []
             problem_descriptions = []
@@ -165,7 +168,7 @@ class AgentService:
                 "easy": 2,
                 "medium": 4,
                 "hard": 6
-            }.get(difficulty_level.lower(), 3)
+            }.get(difficulty_level_str.lower(), 3)
             
             # Calculate number of errors for each type
             build_categories = selected_error_categories.get("build", [])
@@ -240,7 +243,7 @@ class AgentService:
             # Generate code with errors using LLM
             code_with_errors = self._generate_code_with_selected_errors(
                 code_length=code_length,
-                difficulty_level=difficulty_level,
+                difficulty_level=difficulty_level_str,
                 selected_errors=selected_errors
             )
             
@@ -336,12 +339,16 @@ class AgentService:
         domains = ["student_management", "file_processing", "data_validation", "calculation", "inventory_system"]
         domain = random.choice(domains)
         
+        # Ensure parameters are strings
+        code_length_str = str(code_length) if not isinstance(code_length, str) else code_length
+        difficulty_level_str = str(difficulty_level) if not isinstance(difficulty_level, str) else difficulty_level
+        
         # Create complexity profile based on code length
         complexity_profile = {
             "short": "1 class with 2-4 methods and fields",
             "medium": "1 class with 4-6 methods, may include nested classes",
             "long": "2-3 classes with 5-10 methods and proper class relationships"
-        }.get(code_length, "1 class with 4-6 methods")
+        }.get(code_length_str.lower(), "1 class with 4-6 methods")
         
         # Create error instructions
         error_instructions = ""
@@ -421,7 +428,7 @@ class AgentService:
                         - Ensure it's recognizable to a student with beginner to intermediate Java knowledge
                         - Add brief comments nearby (using // Comment format) that hint at the error without directly stating it
                         4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
-                        5. Written entirely in Traditional Chinese (繁體中文)
+                        5. Written entirely in Traditional Chinese (A�-�)
                         I'll now create the Java code with the required errors: """
 
         else:      
@@ -442,10 +449,10 @@ class AgentService:
                 - Ensure it's recognizable to a student with beginner to intermediate Java knowledge
                 - Add brief comments nearby (using // Comment format) that hint at the error without directly stating it
                 4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
-                5. Written entirely in Traditional Chinese (繁體中文)
+                5. Written entirely in Traditional Chinese (A�-�)
 
                 Return ONLY the Java code with the errors included. Do not include any explanations or JSON formatting.
-                All comments, hints and documentation text in the code should be in Traditional Chinese (繁體中文).
+                All comments, hints and documentation text in the code should be in Traditional Chinese (A�-�).
                 """
                 
         return prompt
@@ -569,7 +576,9 @@ class AgentService:
         if identified_problems:
             report += "### Issues You Identified Correctly\n\n"
             for i, problem in enumerate(identified_problems, 1):
-                report += f"**{i}. {problem}**\n\n"
+                # Ensure problem is a string
+                problem_str = str(problem) if not isinstance(problem, str) else problem
+                report += f"**{i}. {problem_str}**\n\n"
                 report += "Great job finding this issue! "
                 report += "This demonstrates your understanding of this type of problem.\n\n"
         
@@ -577,11 +586,14 @@ class AgentService:
         if missed_problems:
             report += "### Issues You Missed\n\n"
             for i, problem in enumerate(missed_problems, 1):
-                report += f"**{i}. {problem}**\n\n"
+                # Ensure problem is a string
+                problem_str = str(problem) if not isinstance(problem, str) else problem
+                problem_lower = problem_str.lower()
+                
+                report += f"**{i}. {problem_str}**\n\n"
                 report += "You didn't identify this issue. "
                 
                 # Add some specific guidance based on the problem type
-                problem_lower = problem.lower()
                 if "null" in problem_lower:
                     report += "When reviewing code, always check for potential null references and proper null handling.\n\n"
                 elif "naming" in problem_lower or "convention" in problem_lower:
@@ -599,7 +611,9 @@ class AgentService:
         if false_positives:
             report += "### Issues You Incorrectly Identified\n\n"
             for i, problem in enumerate(false_positives, 1):
-                report += f"**{i}. {problem}**\n\n"
+                # Ensure problem is a string
+                problem_str = str(problem) if not isinstance(problem, str) else problem
+                report += f"**{i}. {problem_str}**\n\n"
                 report += "This wasn't actually an issue in the code. "
                 report += "Be careful not to flag correct code as problematic.\n\n"
         
