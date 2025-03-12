@@ -395,7 +395,7 @@ def render_status_sidebar(llm_manager: LLMManager):
     st.header("System Status")
     
     # Create a status card
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    #st.markdown('<div class="card">', unsafe_allow_html=True)
     
     # Check Ollama status
     status = check_ollama_status(llm_manager)
@@ -419,7 +419,7 @@ def render_status_sidebar(llm_manager: LLMManager):
             """)
     
     if status["default_model_available"]:
-        st.markdown(f"- Default model: <span class='status-ok'> Available</span>", unsafe_allow_html=True)
+        st.markdown(f"- Default model: <span class='status-ok'>Available</span>", unsafe_allow_html=True)
     else:
         st.markdown(f"- Default model: <span class='status-warning'>� Not Found</span>", unsafe_allow_html=True)
         if status["ollama_running"]:
@@ -455,7 +455,7 @@ def render_settings_sidebar(workflow: JavaCodeReviewGraph):
     st.header("Review Settings")
     
     # Create a settings card
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    #st.markdown('<div class="card">', unsafe_allow_html=True)
     
     # Review iteration settings
     max_iterations = st.slider(
@@ -490,7 +490,7 @@ def render_settings_sidebar(workflow: JavaCodeReviewGraph):
     st.subheader("Display Settings")
     
     # Create display settings card
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    #st.markdown('<div class="card">', unsafe_allow_html=True)
     
     # Toggle for instructor view
     instructor_view = st.checkbox(
@@ -532,7 +532,7 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui):
     st.markdown("### Generate a Java Code Problem")
     
     # Create a content card for the form
-    st.markdown('<div class="content-section">', unsafe_allow_html=True)
+    #st.markdown('<div class="content-section">', unsafe_allow_html=True)
     
     left_col, right_col = st.columns([1, 1])
     
@@ -642,7 +642,7 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui):
     # Display existing code if available
     state = st.session_state.workflow_state
     if state.code_snippet:
-        st.markdown('<div class="content-section">', unsafe_allow_html=True)
+        #st.markdown('<div class="content-section">', unsafe_allow_html=True)
         code_display_ui.render_code_display(
             state.code_snippet.code,
             state.code_snippet.known_problems if st.session_state.get("instructor_view", False) else None
@@ -658,12 +658,12 @@ def render_review_tab(workflow, code_display_ui):
         return
     
     # Code display section
-    st.markdown('<div class="content-section">', unsafe_allow_html=True)
+    #st.markdown('<div class="content-section">', unsafe_allow_html=True)
     code_display_ui.render_code_display(state.code_snippet.code)
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Review submission section
-    st.markdown('<div class="content-section">', unsafe_allow_html=True)
+    #st.markdown('<div class="content-section">', unsafe_allow_html=True)
     
     # Submission callback
     def handle_review_submission(student_review):
@@ -721,7 +721,7 @@ def render_feedback_tab(workflow, feedback_display_ui):
         })
     
     # Display feedback results
-    st.markdown('<div class="content-section">', unsafe_allow_html=True)
+    #st.markdown('<div class="content-section">', unsafe_allow_html=True)
     feedback_display_ui.render_results(
         comparison_report=state.comparison_report,
         review_summary=state.review_summary,
