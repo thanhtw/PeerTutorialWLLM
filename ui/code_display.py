@@ -7,6 +7,7 @@ and handling student review input.
 
 import streamlit as st
 import logging
+import random
 from typing import List, Dict, Any, Optional, Tuple, Callable
 
 # Configure logging
@@ -23,6 +24,11 @@ class CodeDisplayUI:
     This class handles displaying Java code snippets with syntax highlighting,
     line numbers, and optional instructor view.
     """
+    
+    def __init__(self):
+        """Initialize the CodeDisplayUI component with an instance ID for unique keys."""
+        # Generate a random instance ID to ensure unique keys across instances
+        self.instance_id = random.randint(1000, 9999)
     
     def render_code_display(self, code_snippet: str, known_problems: List[str] = None) -> None:
         """
@@ -42,8 +48,13 @@ class CodeDisplayUI:
         numbered_code = self._add_line_numbers(code_snippet)
         st.code(numbered_code, language="java")
         
-        # Create a unique key based on content to prevent duplicate keys
-        download_key = f"download_code_{hash(code_snippet)%10000}"
+        # Create a truly unique key using multiple factors
+        # 1. Instance ID of this class
+        # 2. Hash of code snippet with larger modulo
+        # 3. Random suffix to ensure uniqueness
+        code_hash = abs(hash(code_snippet)) % 100000
+        random_suffix = random.randint(10000, 99999)
+        download_key = f"download_code_{self.instance_id}_{code_hash}_{random_suffix}"
         
         # Download button for the code
         if st.download_button(
@@ -57,7 +68,9 @@ class CodeDisplayUI:
         
         # INSTRUCTOR VIEW: Show known problems if provided
         if known_problems:
-            if st.checkbox("Show Known Problems (Instructor View)", value=False):
+            # Use the same strategy to create a unique key for the checkbox
+            checkbox_key = f"show_problems_{self.instance_id}_{random.randint(1000, 9999)}"
+            if st.checkbox("Show Known Problems (Instructor View)", value=False, key=checkbox_key):
                 st.subheader("Known Problems:")
                 for i, problem in enumerate(known_problems, 1):
                     st.markdown(f"{i}. {problem}")
@@ -153,7 +166,9 @@ class CodeDisplayUI:
                     )
         
         # Display review guidelines
-        with st.expander("📝 Review Guidelines", expanded=False):
+        # Create a unique key for the expander
+        guidelines_key = f"guidelines_{self.instance_id}_{random.randint(1000, 9999)}"
+        with st.expander("📝 Review Guidelines", expanded=False, key=guidelines_key):
             st.markdown("""
             ### How to Write an Effective Code Review:
             
@@ -173,7 +188,7 @@ class CodeDisplayUI:
         st.write("### Your Review:")
         
         # Create a unique key for the text area
-        text_area_key = f"student_review_input_{iteration_count}"
+        text_area_key = f"student_review_input_{self.instance_id}_{iteration_count}"
         
         # Initialize with previous review text only on first load of this iteration
         initial_value = ""
@@ -202,11 +217,15 @@ class CodeDisplayUI:
         # Submit button
         submit_text = "Submit Review" if iteration_count == 1 else f"Submit Review (Attempt {iteration_count}/{max_iterations})"
         
+        # Create unique keys for buttons
+        submit_key = f"submit_review_{self.instance_id}_{iteration_count}"
+        clear_key = f"clear_review_{self.instance_id}_{iteration_count}"
+        
         with submit_col1:
-            submit_button = st.button(submit_text, type="primary", use_container_width=True)
+            submit_button = st.button(submit_text, type="primary", use_container_width=True, key=submit_key)
         
         with submit_col2:
-            clear_button = st.button("Clear", use_container_width=True)
+            clear_button = st.button("Clear", use_container_width=True, key=clear_key)
             
         if clear_button:
             st.session_state[text_area_key] = ""
