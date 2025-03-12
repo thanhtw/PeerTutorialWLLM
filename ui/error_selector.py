@@ -454,7 +454,7 @@ class ErrorSelectorUI:
         if "code_length" not in st.session_state:
             st.session_state.code_length = "Medium"
         
-        st.markdown("### Code Options")
+        #st.markdown("### Code Options")
         
         # Create columns for a more compact layout
         col1, col2 = st.columns(2)
