@@ -166,9 +166,7 @@ class CodeDisplayUI:
                     )
         
         # Display review guidelines
-        # Create a unique key for the expander
-        guidelines_key = f"guidelines_{self.instance_id}_{random.randint(1000, 9999)}"
-        with st.expander("📝 Review Guidelines", expanded=False, key=guidelines_key):
+        with st.expander("📝 Review Guidelines", expanded=False):
             st.markdown("""
             ### How to Write an Effective Code Review:
             
