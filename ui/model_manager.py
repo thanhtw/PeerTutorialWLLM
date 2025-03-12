@@ -382,54 +382,110 @@ class ModelManagerUI:
     
     def _render_model_table(self, models: List[Dict[str, Any]]):
         """
-        Render a table of available models.
+        Render a table of available models with improved styling.
         
         Args:
             models: List of model dictionaries
         """
-        # Create a more dynamic and interactive model display
+        # Add custom CSS for model cards
+        st.markdown("""
+            <style>
+                .model-card {
+                    background-color: white;
+                    border-radius: 8px;
+                    padding: 12px 15px;
+                    margin-bottom: 12px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    transition: transform 0.2s;
+                    border-left: 4px solid #ccc;
+                }
+                .model-card:hover {
+                    transform: translateY(-2px);
+                }
+                .model-card.available {
+                    border-left-color: #4CAF50;
+                }
+                .model-card.not-available {
+                    border-left-color: #9e9e9e;
+                }
+                .model-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 8px;
+                }
+                .model-name {
+                    font-size: 16px;
+                    font-weight: 600;
+                }
+                .model-id {
+                    color: #666;
+                    font-size: 13px;
+                    font-weight: normal;
+                    margin-left: 5px;
+                }
+                .model-status {
+                    font-size: 12px;
+                    padding: 3px 10px;
+                    border-radius: 12px;
+                    font-weight: 500;
+                }
+                .status-available {
+                    background-color: #e8f5e9;
+                    color: #2e7d32;
+                }
+                .status-not-available {
+                    background-color: #f5f5f5;
+                    color: #616161;
+                }
+                .model-description {
+                    font-size: 14px;
+                    color: #333;
+                    margin-bottom: 10px;
+                    line-height: 1.4;
+                }
+                .model-button {
+                    text-align: right;
+                }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        # Render each model as a card
         for model in models:
-            # Create a colored background based on status
+            # Determine status and styling
             if model["pulled"]:
-                bg_color = "#e8f5e9"  # Light green for pulled models
-                border_color = "#4CAF50"
-                status_icon = ""
+                status_class = "available"
+                status_badge_class = "status-available"
                 status_text = "Available"
             else:
-                bg_color = "#f5f5f5"  # Light gray for not pulled models
-                border_color = "#9e9e9e"
-                status_icon = "�"
+                status_class = "not-available"
+                status_badge_class = "status-not-available"
                 status_text = "Not pulled"
             
-            # Create a card for each model
-            st.markdown(
-                f"""
-                <div style="background-color: {bg_color}; border-left: 4px solid {border_color}; 
-                      padding: 10px; margin: 10px 0; border-radius: 4px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <div>
-                            <strong>{model["name"]}</strong> 
-                            <span style="opacity: 0.7; font-size: 0.9em;">({model["id"]})</span>
+            # Create model card with better styling
+            st.markdown(f"""
+                <div class="model-card {status_class}">
+                    <div class="model-header">
+                        <div class="model-name">
+                            {model["name"]} <span class="model-id">({model["id"]})</span>
                         </div>
-                        <div>
-                            <span style="background-color: {border_color}; color: white; 
-                                  padding: 2px 8px; border-radius: 10px; font-size: 0.8em;">
-                                {status_icon} {status_text}
-                            </span>
+                        <div class="model-status {status_badge_class}">
+                            {status_text}
                         </div>
                     </div>
-                    <div style="font-size: 0.9em; margin-top: 5px;">
+                    <div class="model-description">
                         {model["description"]}
                     </div>
                 </div>
-                """, 
-                unsafe_allow_html=True
-            )
+            """, unsafe_allow_html=True)
             
             # Add pull button for models that aren't pulled
+            # Using a separate button outside the HTML for better interaction
             if not model["pulled"]:
-                if st.button(f"Pull {model['id']}", key=f"pull_{model['id']}"):
-                    st.session_state.model_operations["pulling"] = True
-                    st.session_state.model_operations["current_pull"] = model["id"]
-                    st.session_state.model_operations["pull_progress"] = 0
-                    st.rerun()
+                col1, col2, col3 = st.columns([2, 2, 1])
+                with col3:
+                    if st.button(f"Pull Model", key=f"pull_{model['id']}"):
+                        st.session_state.model_operations["pulling"] = True
+                        st.session_state.model_operations["current_pull"] = model["id"]
+                        st.session_state.model_operations["pull_progress"] = 0
+                        st.rerun()
