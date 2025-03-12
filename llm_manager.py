@@ -1,7 +1,15 @@
+"""
+LLM Manager module for Java Peer Review Training System.
+
+This module provides the LLMManager class for handling model initialization,
+configuration, and management of Ollama models.
+"""
+
 import os
 import requests
 import time
 import logging
+import json
 from typing import Dict, Any, Optional, List, Union, Tuple
 from dotenv import load_dotenv
 from functools import lru_cache
@@ -37,6 +45,9 @@ class LLMManager:
         # Track initialized models
         self.initialized_models = {}
         
+        # Track model pull status
+        self.pull_status = {}
+    
     def get_available_models(self) -> List[Dict[str, Any]]:
         """
         Get a list of available Ollama models.
@@ -51,7 +62,9 @@ class LLMManager:
             {"id": "llama3:1b", "name": "Llama 3 (1B)", "description": "Meta's Llama 3 1B model", "pulled": False},
             {"id": "phi3:mini", "name": "Phi-3 Mini", "description": "Microsoft Phi-3 model", "pulled": False},
             {"id": "gemma:2b", "name": "Gemma 2B", "description": "Google's lightweight Gemma model", "pulled": False},
-            {"id": "mistral", "name": "Mistral 7B", "description": "Mistral AI's 7B model", "pulled": False}
+            {"id": "mistral", "name": "Mistral 7B", "description": "Mistral AI's 7B model", "pulled": False},
+            {"id": "codellama:7b", "name": "CodeLlama 7B", "description": "Meta's CodeLlama model for code generation", "pulled": False},
+            {"id": "deepseek-coder:6.7b", "name": "DeepSeek Coder 6.7B", "description": "DeepSeek Coder model for programming tasks", "pulled": False}
         ]
         
         # Check Ollama API for available models
@@ -84,6 +97,56 @@ class LLMManager:
             logger.error(f"Error connecting to Ollama: {str(e)}")
             # Return list with local models marked as pulled
             return library_models
+    
+    def get_model_details(self, model_name: str) -> Dict[str, Any]:
+        """
+        Get detailed information about a specific model.
+        
+        Args:
+            model_name: Name of the model
+            
+        Returns:
+            Dictionary with model details
+        """
+        try:
+            response = requests.get(f"{self.ollama_base_url}/api/show?name={model_name}", timeout=5)
+            
+            if response.status_code == 200:
+                model_info = response.json()
+                
+                # Format model info for display
+                details = {
+                    "name": model_info.get("model", model_name),
+                    "size": self._format_size(model_info.get("size", 0)),
+                    "modified": model_info.get("modified", "Unknown"),
+                    "parameters": model_info.get("parameters", "Unknown"),
+                    "template": model_info.get("template", "Unknown"),
+                    "context_length": model_info.get("details", {}).get("context_length", "Unknown"),
+                    "license": model_info.get("license", "Unknown"),
+                    "modelfile": model_info.get("modelfile", "")
+                }
+                
+                return details
+            
+            return {"name": model_name, "error": f"Status code: {response.status_code}"}
+                
+        except Exception as e:
+            logger.error(f"Error getting model details: {str(e)}")
+            return {"name": model_name, "error": str(e)}
+    
+    def _format_size(self, size_in_bytes: int) -> str:
+        """Format size in human-readable format."""
+        if not isinstance(size_in_bytes, (int, float)):
+            return "Unknown"
+            
+        size = float(size_in_bytes)
+        
+        for unit in ["B", "KB", "MB", "GB"]:
+            if size < 1024.0:
+                return f"{size:.2f} {unit}"
+            size /= 1024.0
+            
+        return f"{size:.2f} TB"
             
     def download_ollama_model(self, model_name: str) -> bool:
         """
@@ -96,6 +159,12 @@ class LLMManager:
             bool: True if successful, False otherwise
         """
         try:
+            self.pull_status[model_name] = {
+                "status": "pulling",
+                "progress": 0,
+                "error": None
+            }
+            
             # Start the pull operation
             response = requests.post(
                 f"{self.ollama_base_url}/api/pull",
@@ -105,6 +174,11 @@ class LLMManager:
             
             if response.status_code != 200:
                 logger.error(f"Failed to start model download: {response.text}")
+                self.pull_status[model_name] = {
+                    "status": "failed",
+                    "progress": 0,
+                    "error": f"Failed to start download: {response.text}"
+                }
                 return False
             
             logger.info(f"Started downloading {model_name}...")
@@ -122,23 +196,73 @@ class LLMManager:
                         models = check_response.json().get("models", [])
                         if any(model["name"] == model_name for model in models):
                             model_ready = True
+                            self.pull_status[model_name] = {
+                                "status": "completed",
+                                "progress": 100,
+                                "error": None
+                            }
                             logger.info(f"Model {model_name} downloaded successfully!")
                             break
-                    time.sleep(5)  # Check every 5 seconds
+                    
+                    # Update progress (simulated)
+                    elapsed = time.time() - start_time
+                    progress = min(95, int(elapsed / (max_wait_time * 0.8) * 100))
+                    
+                    self.pull_status[model_name] = {
+                        "status": "pulling",
+                        "progress": progress,
+                        "error": None
+                    }
+                    
+                    time.sleep(2)  # Check every 2 seconds
                 except Exception as e:
                     # Log error but continue polling
                     logger.warning(f"Error checking model status: {str(e)}")
+                    self.pull_status[model_name] = {
+                        "status": "pulling",
+                        "progress": self.pull_status[model_name].get("progress", 0),
+                        "error": f"Error checking status: {str(e)}"
+                    }
                     time.sleep(5)
             
             if not model_ready:
                 logger.warning(f"Download timeout for {model_name}. It may still be downloading.")
+                self.pull_status[model_name] = {
+                    "status": "timeout",
+                    "progress": self.pull_status[model_name].get("progress", 0),
+                    "error": "Download timeout. The model may still be downloading."
+                }
                 return False
             
             return True
                 
         except Exception as e:
             logger.error(f"Error downloading model: {str(e)}")
+            self.pull_status[model_name] = {
+                "status": "failed",
+                "progress": 0,
+                "error": str(e)
+            }
             return False
+    
+    def get_pull_status(self, model_name: str) -> Dict[str, Any]:
+        """
+        Get the current pull status of a model.
+        
+        Args:
+            model_name: Name of the model
+            
+        Returns:
+            Dictionary with pull status information
+        """
+        if model_name not in self.pull_status:
+            return {
+                "status": "unknown",
+                "progress": 0,
+                "error": None
+            }
+            
+        return self.pull_status[model_name]
     
     def check_ollama_connection(self) -> Tuple[bool, str]:
         """
@@ -305,7 +429,12 @@ class LLMManager:
             # Removed max_tokens parameter - caused validation errors with some Ollama versions
         }
         
-        # Adjust based on model name
+        # Add appropriate system message for specific model types
+        if "code" in model_name.lower() or any(code_model in model_name.lower() for code_model in ["codellama", "deepseek-coder"]):
+            # For code-oriented models
+            params["temperature"] = 0.5  # Lower temperature for code generation
+            
+        # Adjust based on model name and role
         if "generative" in model_name or any(gen in model_name for gen in ["llama3", "llama-3"]):
             params["temperature"] = 0.8  # Slightly higher creativity for generative tasks
             
@@ -319,3 +448,40 @@ class LLMManager:
             params["temperature"] = 0.5  # Balanced temperature for comparison tasks
         
         return params
+    
+    def delete_model(self, model_name: str) -> bool:
+        """
+        Delete a model from Ollama.
+        
+        Args:
+            model_name: Name of the model to delete
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            response = requests.delete(
+                f"{self.ollama_base_url}/api/delete",
+                json={"name": model_name},
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Successfully deleted model: {model_name}")
+                
+                # Remove from initialized models if present
+                if model_name in self.initialized_models:
+                    del self.initialized_models[model_name]
+                
+                # Remove from pull status if present
+                if model_name in self.pull_status:
+                    del self.pull_status[model_name]
+                
+                return True
+            else:
+                logger.error(f"Failed to delete model: {response.text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error deleting model: {str(e)}")
+            return False

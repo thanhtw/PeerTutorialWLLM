@@ -7,7 +7,10 @@ This module implements the code review workflow as a LangGraph graph.
 __all__ = ['JavaCodeReviewGraph']
 
 import logging
-from typing import Dict, List, Any, Annotated, TypedDict, cast
+import os
+import random
+import re
+from typing import Dict, List, Any, Annotated, TypedDict, Tuple, cast, Optional
 from langgraph.graph import StateGraph, END
 from state_schema import WorkflowState, CodeSnippet, ReviewAttempt
 
@@ -108,38 +111,28 @@ class JavaCodeReviewGraph:
             selected_error_categories = state.selected_error_categories
             
             # Generate code with errors
-            selected_errors = []
-            problem_descriptions = []
-            
             # Get errors from selected categories
-            errors = self.error_repository.get_errors_by_categories(selected_error_categories)
-            
+            selected_errors, problem_descriptions = self.error_repository.get_errors_for_llm(
+                selected_categories=selected_error_categories,
+                count=self._get_error_count_for_difficulty(difficulty_level),
+                difficulty=difficulty_level
+            )
+                        
             # Generate code with selected errors
             code_with_errors = self._generate_code_with_errors(
                 code_length=code_length,
                 difficulty_level=difficulty_level,
-                selected_errors=errors
+                selected_errors=selected_errors
             )
-                        
-            # Create problem descriptions
-            for error_type, error_list in errors.items():
-                for error in error_list:
-                    if error_type == "build":
-                        name = error.get("error_name", "Unknown error")
-                        description = error.get("description", "")
-                        category = error.get("category", "")
-                        problem_descriptions.append(f"Build Error - {name}: {description} (Category: {category})")
-                    else:  # checkstyle
-                        name = error.get("check_name", "Unknown check")
-                        description = error.get("description", "")
-                        category = error.get("category", "")
-                        problem_descriptions.append(f"Checkstyle Error - {name}: {description} (Category: {category})")
             
             # Create code snippet object
             code_snippet = CodeSnippet(
                 code=code_with_errors,
                 known_problems=problem_descriptions,
-                raw_errors=errors  # This is now correctly typed as Dict[str, List[Dict[str, Any]]]
+                raw_errors={
+                    "build": [e for e in selected_errors if e["type"] == "build"],
+                    "checkstyle": [e for e in selected_errors if e["type"] == "checkstyle"]
+                }
             )
             
             # Update state
@@ -153,10 +146,57 @@ class JavaCodeReviewGraph:
             state.error = f"Error generating code: {str(e)}"
             return state
     
+    def generate_code_with_specific_errors(self, state: WorkflowState, specific_errors: List[Dict[str, Any]]) -> WorkflowState:
+        """Generate Java code with specific errors selected by the user."""
+        try:
+            # Get parameters from state
+            code_length = state.code_length
+            difficulty_level = state.difficulty_level
+            
+            # Format problem descriptions
+            problem_descriptions = []
+            for error in specific_errors:
+                error_type = error.get("type", "Unknown")
+                name = error.get("name", "Unknown")
+                description = error.get("description", "")
+                category = error.get("category", "")
+                
+                if error_type == "build":
+                    problem_descriptions.append(f"Build Error - {name}: {description} (Category: {category})")
+                else:  # checkstyle
+                    problem_descriptions.append(f"Checkstyle Error - {name}: {description} (Category: {category})")
+            
+            # Generate code with selected errors
+            code_with_errors = self._generate_code_with_errors(
+                code_length=code_length,
+                difficulty_level=difficulty_level,
+                selected_errors=specific_errors
+            )
+            
+            # Create code snippet object
+            code_snippet = CodeSnippet(
+                code=code_with_errors,
+                known_problems=problem_descriptions,
+                raw_errors={
+                    "build": [e for e in specific_errors if e["type"] == "build"],
+                    "checkstyle": [e for e in specific_errors if e["type"] == "checkstyle"]
+                }
+            )
+            
+            # Update state
+            state.code_snippet = code_snippet
+            state.current_step = "review"
+            
+            return state
+            
+        except Exception as e:
+            logger.error(f"Error generating code with specific errors: {str(e)}")
+            state.error = f"Error generating code with specific errors: {str(e)}"
+            return state
+    
     def review_code_node(self, state: WorkflowState) -> WorkflowState:
         """Review code node - this is a placeholder since user input happens in the UI."""
         # This node is primarily a placeholder since the actual review is submitted via the UI
-        # The UI will call the submit_review method directly
         state.current_step = "review"
         return state
     
@@ -249,7 +289,7 @@ class JavaCodeReviewGraph:
             final_feedback = self.feedback_manager.generate_final_feedback()
             
             # Safe version of comparison report generation
-            comparison_report = self._safe_generate_comparison_report(
+            comparison_report = self._generate_comparison_report(
                 state.code_snippet.known_problems,
                 state.review_history[-1].analysis if state.review_history else {}
             )
@@ -266,95 +306,6 @@ class JavaCodeReviewGraph:
             state.error = f"Error generating summary: {str(e)}"
             return state
     
-    def _safe_generate_comparison_report(self, known_problems: List[str], review_analysis: Dict[str, Any]) -> str:
-        """
-        Safely generate a comparison report between student review and known problems.
-        Handles type checking to prevent errors.
-        
-        Args:
-            known_problems: List of known problems
-            review_analysis: Analysis of the student review
-            
-        Returns:
-            Comparison report text
-        """
-        try:
-            # Create report header
-            report = "# Detailed Comparison: Your Review vs. Actual Issues\n\n"
-            
-            # Problems section
-            report += "## Code Issues Analysis\n\n"
-            
-            # Safely extract data from review analysis
-            identified_problems = review_analysis.get("identified_problems", [])
-            missed_problems = review_analysis.get("missed_problems", [])
-            false_positives = review_analysis.get("false_positives", [])
-            
-            # Ensure all problems are properly converted to strings
-            known_problems_str = [str(p) if not isinstance(p, str) else p for p in known_problems]
-            identified_problems_str = [str(p) if not isinstance(p, str) else p for p in identified_problems]
-            missed_problems_str = [str(p) if not isinstance(p, str) else p for p in missed_problems]
-            false_positives_str = [str(p) if not isinstance(p, str) else p for p in false_positives]
-            
-            # Issues found correctly
-            if identified_problems_str:
-                report += "### Issues You Identified Correctly\n\n"
-                for i, problem in enumerate(identified_problems_str, 1):
-                    report += f"**{i}. {problem}**\n\n"
-                    report += "Great job finding this issue! "
-                    report += "This demonstrates your understanding of this type of problem.\n\n"
-            
-            # Issues missed
-            if missed_problems_str:
-                report += "### Issues You Missed\n\n"
-                for i, problem in enumerate(missed_problems_str, 1):
-                    report += f"**{i}. {problem}**\n\n"
-                    report += "You didn't identify this issue. "
-                    
-                    # Add some specific guidance based on the problem type
-                    problem_lower = problem.lower()
-                    if "null" in problem_lower:
-                        report += "When reviewing code, always check for potential null references and proper null handling.\n\n"
-                    elif "naming" in problem_lower or "convention" in problem_lower:
-                        report += "Pay attention to naming conventions in Java. Classes should use UpperCamelCase, while methods and variables should use lowerCamelCase.\n\n"
-                    elif "javadoc" in problem_lower or "comment" in problem_lower:
-                        report += "Remember to check for proper documentation. Methods should have complete Javadoc comments with @param and @return tags where appropriate.\n\n"
-                    elif "exception" in problem_lower or "throw" in problem_lower:
-                        report += "Always verify that exceptions are either caught or declared in the method signature with 'throws'.\n\n"
-                    elif "loop" in problem_lower or "condition" in problem_lower:
-                        report += "Carefully examine loop conditions for off-by-one errors or potential infinite loops.\n\n"
-                    else:
-                        report += "This is something to look for in future code reviews.\n\n"
-            
-            # Calculate some metrics
-            total_problems = len(known_problems_str)
-            identified_count = len(identified_problems_str)
-            missed_count = len(missed_problems_str)
-            false_positive_count = len(false_positives_str)
-            
-            accuracy = (identified_count / total_problems * 100) if total_problems > 0 else 0
-            
-            # Overall assessment
-            report += "### Overall Assessment\n\n"
-            
-            if accuracy >= 80:
-                report += "**Excellent review!** You found most of the issues in the code.\n\n"
-            elif accuracy >= 60:
-                report += "**Good review.** You found many issues, but missed some important ones.\n\n"
-            elif accuracy >= 40:
-                report += "**Fair review.** You found some issues, but missed many important ones.\n\n"
-            else:
-                report += "**Needs improvement.** You missed most of the issues in the code.\n\n"
-            
-            report += f"- You identified {identified_count} out of {total_problems} issues ({accuracy:.1f}%)\n"
-            report += f"- You missed {missed_count} issues\n"
-            report += f"- You incorrectly identified {false_positive_count} non-issues\n\n"
-            
-            return report
-        
-        except Exception as e:
-            logger.error(f"Error generating comparison report: {str(e)}")
-            return "Error generating comparison report. Your review was processed, but we couldn't generate a detailed comparison."
     # Conditional edge implementations
     def should_continue_review(self, state: WorkflowState) -> str:
         """
@@ -372,24 +323,15 @@ class JavaCodeReviewGraph:
         return "continue_review"
     
     # Helper methods
-    def _generate_code_with_errors(self, code_length: str, difficulty_level: str, selected_errors: Dict[str, List[Dict[str, Any]]]) -> str:
+    def _generate_code_with_errors(self, code_length: str, difficulty_level: str, selected_errors: List[Dict[str, Any]]) -> str:
         """Generate Java code with the selected errors."""
-        # Flatten the errors into a single list
-        flat_errors = []
-        for error_type, errors in selected_errors.items():
-            for error in errors:
-                flat_errors.append({
-                    "type": error_type,
-                    **error
-                })
-        
         # Use the code generator to create code with errors
         if hasattr(self.code_generator, 'llm') and self.code_generator.llm:
             # Create a detailed prompt for the LLM
             prompt = self._create_code_generation_prompt(
                 code_length=code_length,
                 difficulty_level=difficulty_level,
-                selected_errors=flat_errors
+                selected_errors=selected_errors
             )
             
             # Generate code with errors
@@ -405,22 +347,140 @@ class JavaCodeReviewGraph:
             difficulty_level=difficulty_level
         )
 
-        return self._add_error_comments(base_code, flat_errors)
+        return self._add_error_comments(base_code, selected_errors)
     
     def _create_code_generation_prompt(self, code_length: str, difficulty_level: str, selected_errors: List[Dict[str, Any]]) -> str:
-        """Create a prompt for generating code with errors."""
-        # Implementation similar to the original _create_direct_code_generation_prompt method
-        # (code omitted for brevity)
-        return "Detailed prompt for generating Java code with errors"
+        """Create a prompt for generating code with specific errors."""
+        # Create domain context based on the errors
+        domains = ["student_management", "file_processing", "data_validation", "calculation", "inventory_system"]
+        domain = random.choice(domains)
+        
+        # Ensure parameters are strings
+        code_length_str = str(code_length) if not isinstance(code_length, str) else code_length
+        difficulty_level_str = str(difficulty_level) if not isinstance(difficulty_level, str) else difficulty_level
+        
+        # Create complexity profile based on code length
+        complexity_profile = {
+            "short": "1 class with 2-4 methods and fields",
+            "medium": "1 class with 4-6 methods, may include nested classes",
+            "long": "2-3 classes with 5-10 methods and proper class relationships"
+        }.get(code_length_str.lower(), "1 class with 4-6 methods")
+        
+        # Create error instructions
+        error_instructions = ""
+        for i, error in enumerate(selected_errors, 1):
+            error_type = error["type"]
+            category = error.get("category", "")
+            name = error["name"]
+            description = error["description"]
+            
+            error_instructions += f"{i}. {error_type.upper()} ERROR - {name}\n"
+            error_instructions += f"   Category: {category}\n"
+            error_instructions += f"   Description: {description}\n"
+            
+            # Add specific implementation suggestion based on error type and name
+            if error_type == "build":
+                if "Cannot find symbol" in name:
+                    error_instructions += f"   Implementation: Use a variable, method, or class that hasn't been defined or imported\n"
+                elif "NullPointer" in name:
+                    error_instructions += f"   Implementation: Create a scenario where a null object is accessed without proper null check\n"
+                elif "Incompatible types" in name or "Type mismatch" in name:
+                    error_instructions += f"   Implementation: Assign a value to a variable of an incompatible type\n"
+                elif "Missing return" in name:
+                    error_instructions += f"   Implementation: Remove the return statement from a non-void method\n"
+                elif "Unreported exception" in name:
+                    error_instructions += f"   Implementation: Throw a checked exception without a try-catch or throws declaration\n"
+                elif "Class not found" in name or "Package does not exist" in name:
+                    error_instructions += f"   Implementation: Import a non-existent class or package\n"
+                elif "ArrayIndexOutOfBounds" in name or "IndexOutOfBounds" in name:
+                    error_instructions += f"   Implementation: Access an array or list with an invalid index\n"
+                else:
+                    error_instructions += f"   Implementation: Create this error in a way that matches its description\n"
+            else:  # checkstyle
+                if "Naming" in name or "Name" in name:
+                    error_instructions += f"   Implementation: Use inappropriate naming convention for a class, method, or variable\n"
+                elif "Whitespace" in name or "Indentation" in name:
+                    error_instructions += f"   Implementation: Use inconsistent or incorrect whitespace/indentation\n"
+                elif "Javadoc" in name or "Comment" in name:
+                    error_instructions += f"   Implementation: Create missing or improperly formatted Javadoc/comments\n"
+                elif "Braces" in name or "Curly" in name or "LeftCurly" in name or "RightCurly" in name:
+                    error_instructions += f"   Implementation: Place curly braces inconsistently or incorrectly\n"
+                elif "Import" in name:
+                    error_instructions += f"   Implementation: Create import-related issues like unused imports or star imports\n"
+                elif "Empty" in name:
+                    error_instructions += f"   Implementation: Create an empty block or statement without proper comments\n"
+                elif "Magic" in name:
+                    error_instructions += f"   Implementation: Use magic numbers instead of named constants\n"
+                else:
+                    error_instructions += f"   Implementation: Create this style violation naturally\n"
+                
+            error_instructions += "\n"
+        
+        # Check if reasoning mode is enabled
+        reasoning_mode = os.getenv("REASONING_MODE", "false").lower() == "true"
+        
+        # Create the full prompt
+        if reasoning_mode:
+            prompt = f"""You are an expert Java programming educator who creates code review exercises with intentional errors.
+
+Please create a {code_length} Java code example for a {domain} system with {complexity_profile}.
+The code should be realistic, well-structured, and include the following specific errors:
+
+{error_instructions}
+
+Let's think through this step by step:
+
+1. First, I'll design the overall structure of the Java application for a {domain} system.
+2. Then, I'll identify where each error should be placed to create a realistic learning scenario.
+3. Next, I'll implement the code with these intentional errors in a way that maintains realism.
+4. Finally, I'll review the code to ensure all required errors are present and the code is otherwise valid.
+
+Requirements:
+1. Write a complete, compilable Java code (except for the intentional errors)
+2. Make the code realistic and representative of actual Java applications
+3. For each error you include:
+   - Make sure it exactly matches the description provided
+   - Place it at a logical location in the code
+   - Ensure it's recognizable to a student with beginner to intermediate Java knowledge
+   - Add brief comments nearby (using // Comment format) that hint at the error without directly stating it
+4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
+
+I'll now create the Java code with the required errors:
+"""
+        else:      
+            # Create the full prompt
+            prompt = f"""You are an expert Java programming educator who creates code review exercises with intentional errors.
+
+Please create a {code_length} Java code example for a {domain} system with {complexity_profile}.
+The code should be realistic, well-structured, and include the following specific errors:
+
+{error_instructions}
+
+Requirements:
+1. Write a complete, compilable Java code (except for the intentional errors)
+2. Make the code realistic and representative of actual Java applications
+3. For each error you include:
+   - Make sure it exactly matches the description provided
+   - Place it at a logical location in the code
+   - Ensure it's recognizable to a student with beginner to intermediate Java knowledge
+   - Add brief comments nearby (using // Comment format) that hint at the error without directly stating it
+4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
+
+Return ONLY the Java code with the errors included. Do not include any explanations or JSON formatting.
+"""
+        
+        return prompt
     
     def _extract_code_from_response(self, response: str) -> str:
-        """Extract code from LLM response."""
-        import re
+        """Extract Java code from LLM response."""
+        # Try to extract code from code blocks
         code_blocks = re.findall(r'```(?:java)?\s*(.*?)\s*```', response, re.DOTALL)
         
         if code_blocks:
+            # Return the largest code block
             return max(code_blocks, key=len)
         
+        # If no code blocks are found, assume the entire response is code
         return response.strip()
     
     def _add_error_comments(self, code: str, errors: List[Dict[str, Any]]) -> str:
@@ -429,7 +489,7 @@ class JavaCodeReviewGraph:
         
         for i, error in enumerate(errors):
             error_type = error.get("type", "unknown")
-            name = error.get("error_name", error.get("check_name", "unknown error"))
+            name = error.get("name", "unknown error")
             description = error.get("description", "")
             
             position = min(5 + i * 3, len(lines) - 1)
@@ -441,11 +501,141 @@ class JavaCodeReviewGraph:
     
     def _generate_comparison_report(self, known_problems: List[str], review_analysis: Dict[str, Any]) -> str:
         """Generate a comparison report between student review and known problems."""
-        # Implementation similar to the original _generate_comparison_report method
-        # (code omitted for brevity)
+        # Create report header
         report = "# Detailed Comparison: Your Review vs. Actual Issues\n\n"
-        # ... rest of implementation
+        
+        # Problems section
+        report += "## Code Issues Analysis\n\n"
+        
+        # Safely extract data from review analysis
+        identified_problems = review_analysis.get("identified_problems", [])
+        missed_problems = review_analysis.get("missed_problems", [])
+        false_positives = review_analysis.get("false_positives", [])
+        
+        # Ensure all problems are properly converted to strings
+        known_problems_str = [str(p) if not isinstance(p, str) else p for p in known_problems]
+        identified_problems_str = [str(p) if not isinstance(p, str) else p for p in identified_problems]
+        missed_problems_str = [str(p) if not isinstance(p, str) else p for p in missed_problems]
+        false_positives_str = [str(p) if not isinstance(p, str) else p for p in false_positives]
+        
+        # Issues found correctly
+        if identified_problems_str:
+            report += "### Issues You Identified Correctly\n\n"
+            for i, problem in enumerate(identified_problems_str, 1):
+                report += f"**{i}. {problem}**\n\n"
+                report += "Great job finding this issue! "
+                report += "This demonstrates your understanding of this type of problem.\n\n"
+        
+        # Issues missed
+        if missed_problems_str:
+            report += "### Issues You Missed\n\n"
+            for i, problem in enumerate(missed_problems_str, 1):
+                report += f"**{i}. {problem}**\n\n"
+                report += "You didn't identify this issue. "
+                
+                # Add some specific guidance based on the problem type
+                problem_lower = problem.lower()
+                if "null" in problem_lower:
+                    report += "When reviewing code, always check for potential null references and proper null handling.\n\n"
+                elif "naming" in problem_lower or "convention" in problem_lower:
+                    report += "Pay attention to naming conventions in Java. Classes should use UpperCamelCase, while methods and variables should use lowerCamelCase.\n\n"
+                elif "javadoc" in problem_lower or "comment" in problem_lower:
+                    report += "Remember to check for proper documentation. Methods should have complete Javadoc comments with @param and @return tags where appropriate.\n\n"
+                elif "exception" in problem_lower or "throw" in problem_lower:
+                    report += "Always verify that exceptions are either caught or declared in the method signature with 'throws'.\n\n"
+                elif "loop" in problem_lower or "condition" in problem_lower:
+                    report += "Carefully examine loop conditions for off-by-one errors or potential infinite loops.\n\n"
+                else:
+                    report += "This is something to look for in future code reviews.\n\n"
+        
+        # False positives
+        if false_positives_str:
+            report += "### Issues You Incorrectly Identified\n\n"
+            for i, problem in enumerate(false_positives_str, 1):
+                report += f"**{i}. {problem}**\n\n"
+                report += "This wasn't actually an issue in the code. "
+                report += "Be careful not to flag correct code as problematic.\n\n"
+        
+        # Calculate some metrics
+        total_problems = len(known_problems_str)
+        identified_count = len(identified_problems_str)
+        missed_count = len(missed_problems_str)
+        false_positive_count = len(false_positives_str)
+        
+        accuracy = (identified_count / total_problems * 100) if total_problems > 0 else 0
+        
+        # Overall assessment
+        report += "### Overall Assessment\n\n"
+        
+        if accuracy >= 80:
+            report += "**Excellent review!** You found most of the issues in the code.\n\n"
+        elif accuracy >= 60:
+            report += "**Good review.** You found many issues, but missed some important ones.\n\n"
+        elif accuracy >= 40:
+            report += "**Fair review.** You found some issues, but missed many important ones.\n\n"
+        else:
+            report += "**Needs improvement.** You missed most of the issues in the code.\n\n"
+        
+        report += f"- You identified {identified_count} out of {total_problems} issues ({accuracy:.1f}%)\n"
+        report += f"- You missed {missed_count} issues\n"
+        report += f"- You incorrectly identified {false_positive_count} non-issues\n\n"
+        
+        # Add improvement tips
+        report += "## Tips for Improvement\n\n"
+        
+        if missed_problems_str:
+            # Categories of missed issues
+            missed_categories = []
+            
+            for problem in missed_problems_str:
+                problem_lower = problem.lower()
+                if "null" in problem_lower:
+                    missed_categories.append("null pointer handling")
+                elif "naming" in problem_lower or "convention" in problem_lower:
+                    missed_categories.append("naming conventions")
+                elif "javadoc" in problem_lower or "comment" in problem_lower:
+                    missed_categories.append("documentation")
+                elif "exception" in problem_lower or "throw" in problem_lower:
+                    missed_categories.append("exception handling")
+                elif "loop" in problem_lower or "condition" in problem_lower:
+                    missed_categories.append("logical conditions")
+                elif "whitespace" in problem_lower or "indentation" in problem_lower:
+                    missed_categories.append("code formatting")
+                elif "array" in problem_lower or "index" in problem_lower:
+                    missed_categories.append("array handling")
+            
+            # Remove duplicates and sort
+            missed_categories = sorted(set(missed_categories))
+            
+            if missed_categories:
+                report += "Based on your review, focus on these areas in future code reviews:\n\n"
+                for category in missed_categories:
+                    report += f"- **{category.title()}**\n"
+                report += "\n"
+        
+        # Add systematic approach suggestion
+        report += """### Systematic Review Approach
+
+For more thorough code reviews, try this systematic approach:
+
+1. **First pass**: Check for syntax errors, compilation issues, and obvious bugs
+2. **Second pass**: Examine naming conventions, code style, and documentation
+3. **Third pass**: Analyze logical flow, edge cases, and potential runtime errors
+4. **Final pass**: Look for performance issues, security concerns, and maintainability problems
+
+By following a structured approach, you'll catch more issues and provide more comprehensive reviews.
+"""
+        
         return report
+    
+    def _get_error_count_for_difficulty(self, difficulty: str) -> int:
+        """Get appropriate error count based on difficulty level."""
+        difficulty_map = {
+            "easy": 2,
+            "medium": 4,
+            "hard": 6
+        }
+        return difficulty_map.get(str(difficulty).lower(), 4)
     
     # Public interface methods
     def get_all_error_categories(self) -> Dict[str, List[str]]:

@@ -8,7 +8,8 @@ eliminating the need for intermediate data transformation.
 import os
 import json
 import logging
-from typing import Dict, List, Any, Optional, Set
+import random
+from typing import Dict, List, Any, Optional, Set, Union, Tuple
 
 # Configure logging
 logging.basicConfig(
@@ -231,8 +232,6 @@ class JsonErrorRepository:
         Returns:
             List of selected errors with type and category information
         """
-        import random
-        
         all_errors = []
         build_categories = selected_categories.get("build", [])
         checkstyle_categories = selected_categories.get("checkstyle", [])
@@ -269,6 +268,76 @@ class JsonErrorRepository:
             return random.sample(all_errors, count)
         
         return []
+    
+    def get_errors_for_llm(self, 
+                         selected_categories: Dict[str, List[str]] = None, 
+                         specific_errors: List[Dict[str, Any]] = None,
+                         count: int = 4, 
+                         difficulty: str = "medium") -> Tuple[List[Dict[str, Any]], List[str]]:
+        """
+        Get errors suitable for sending to the LLM for code generation.
+        Can use either category-based selection or specific errors.
+        
+        Args:
+            selected_categories: Dictionary with selected error categories
+            specific_errors: List of specific errors to include
+            count: Number of errors to select if using categories
+            difficulty: Difficulty level to adjust error count
+            
+        Returns:
+            Tuple of (list of error objects, list of problem descriptions)
+        """
+        # Adjust count based on difficulty
+        error_counts = {
+            "easy": max(2, count - 2),
+            "medium": count,
+            "hard": count + 2
+        }
+        adjusted_count = error_counts.get(difficulty.lower(), count)
+        
+        # If specific errors are provided, use those
+        if specific_errors and len(specific_errors) > 0:
+            selected_errors = specific_errors
+            
+            # Format problem descriptions
+            problem_descriptions = []
+            for error in selected_errors:
+                error_type = error.get("type", "Unknown")
+                name = error.get("name", "Unknown")
+                description = error.get("description", "")
+                category = error.get("category", "")
+                
+                if error_type == "build":
+                    problem_descriptions.append(f"Build Error - {name}: {description} (Category: {category})")
+                else:  # checkstyle
+                    problem_descriptions.append(f"Checkstyle Error - {name}: {description} (Category: {category})")
+            
+            return selected_errors, problem_descriptions
+        
+        # Otherwise use category-based selection
+        elif selected_categories:
+            selected_errors = self.get_random_errors_by_categories(
+                selected_categories, 
+                count=adjusted_count
+            )
+            
+            # Format problem descriptions
+            problem_descriptions = []
+            for error in selected_errors:
+                error_type = error.get("type", "Unknown")
+                name = error.get("name", "Unknown")
+                description = error.get("description", "")
+                category = error.get("category", "")
+                
+                if error_type == "build":
+                    problem_descriptions.append(f"Build Error - {name}: {description} (Category: {category})")
+                else:  # checkstyle
+                    problem_descriptions.append(f"Checkstyle Error - {name}: {description} (Category: {category})")
+            
+            return selected_errors, problem_descriptions
+        
+        # If no selection method was provided, return empty lists
+        return [], []
     
     def search_errors(self, search_term: str) -> List[Dict[str, Any]]:
         """
@@ -312,3 +381,36 @@ class JsonErrorRepository:
                     })
         
         return results
+    
+    def get_error_by_name(self, error_type: str, error_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific error by name.
+        
+        Args:
+            error_type: Type of error ('build' or 'checkstyle')
+            error_name: Name of the error
+            
+        Returns:
+            Error dictionary with added type and category, or None if not found
+        """
+        if error_type == "build":
+            for category, errors in self.build_errors.items():
+                for error in errors:
+                    if error.get("error_name") == error_name:
+                        return {
+                            "type": "build",
+                            "category": category,
+                            "name": error["error_name"],
+                            "description": error["description"]
+                        }
+        elif error_type == "checkstyle":
+            for category, errors in self.checkstyle_errors.items():
+                for error in errors:
+                    if error.get("check_name") == error_name:
+                        return {
+                            "type": "checkstyle",
+                            "category": category,
+                            "name": error["check_name"],
+                            "description": error["description"]
+                        }
+        return None
