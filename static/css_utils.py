@@ -124,7 +124,7 @@ def inject_custom_css():
     
     .model-available {
       border-left-color: #4CAF50;
-      background-color: rgba(76, 175, 80, 0.1);
+      background-color: rgb(14, 17, 23) !important;
     }
     
     .model-name, .model-title, .role-title {

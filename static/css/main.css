@@ -140,7 +140,7 @@ div[data-testid="stVerticalBlock"] > div[data-testid="stCheckbox"] {
 }
 
 [data-theme="dark"] .model-badge.badge-available {
-    background-color: rgba(76, 175, 80, 0.2);
+    background-color: #28a745;
     color: #81c784;
 }
 
