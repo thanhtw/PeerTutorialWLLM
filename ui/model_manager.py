@@ -393,7 +393,7 @@ class ModelManagerUI:
             if model["pulled"]:
                 bg_color = "#e8f5e9"  # Light green for pulled models
                 border_color = "#4CAF50"
-                status_icon = ""
+                status_icon = ""
                 status_text = "Available"
             else:
                 bg_color = "#f5f5f5"  # Light gray for not pulled models
@@ -404,8 +404,7 @@ class ModelManagerUI:
             # Create a card for each model
             st.markdown(
                 f"""
-                <div style="background-color: {bg_color}; border-left: 4px solid {border_color}; 
-                      padding: 10px; margin: 10px 0; border-radius: 4px;">
+                <div>
                     <div style="display: flex; justify-content: space-between;">
                         <div>
                             <strong>{model["name"]}</strong> 

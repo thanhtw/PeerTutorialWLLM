@@ -433,8 +433,7 @@ def render_status_sidebar(llm_manager: LLMManager):
                 background-color: #fff3cd;
                 color: #856404;
             }
-            .about-box {
-                background-color: #e6f3ff;
+            .about-box {                
                 border-radius: 8px;
                 padding: 15px;
                 margin-top: 20px;
