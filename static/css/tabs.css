@@ -84,7 +84,7 @@
 
 /* Dark mode refinements */
 [data-theme="dark"] .stTabs [data-baseweb="tab"] {
-  background-color: rgba(76, 104, 215, 0.15);
+  background-color:#262730;
 }
 
 [data-theme="dark"] .stTabs [data-baseweb="tab-list"] {
@@ -108,5 +108,12 @@
   color: white !important;
 }
 .stAlert{
+  color: white !important;
+}
+
+.st-ba{
+  color: white !important;
+}
+p{
   color: white !important;
 }
