@@ -120,11 +120,11 @@
 .role-title {
     font-weight: 600;
     font-size: 1.05em;
-    color: var(--text);
+    color: white;
 }
 
 .role-icon {
-    color: var(--primary);
+    color: white;
     font-size: 1.2em;
     margin-right: 8px;
 }
@@ -145,7 +145,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    color: var(--text);
+    color: white;
 }
 
 .model-badge {

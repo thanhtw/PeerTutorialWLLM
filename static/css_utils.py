@@ -147,7 +147,7 @@ def inject_custom_css():
     }
     
     .selected-model {
-      color: var(--text);
+      color: white;
     }
     
     /* Fix text in problem areas */

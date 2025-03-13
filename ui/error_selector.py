@@ -472,9 +472,6 @@ class ErrorSelectorUI:
         if "code_length" not in st.session_state:
             st.session_state.code_length = "Medium"
         
-        st.markdown("### Code Generation Parameters")      
-       
-        
         st.markdown('<div class="param-container">', unsafe_allow_html=True)
         
         # Create columns for a more compact layout

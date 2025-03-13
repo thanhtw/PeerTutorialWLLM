@@ -485,14 +485,9 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui):
     left_col, right_col = st.columns([1, 1])
     
     with left_col:
-        # Code parameters
-        st.subheader("#### Code Options")
-        params = error_selector_ui.render_code_params()
-        
-        # Mode selection (simplified)
-        st.subheader("#### Error Selection")
-        mode = error_selector_ui.render_mode_selector()
-    
+        # Code parameters        
+        params = error_selector_ui.render_code_params()   
+        mode = error_selector_ui.render_mode_selector()    
     with right_col:
         if mode == "standard":
             # Standard mode - problem areas
