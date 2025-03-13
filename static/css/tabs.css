@@ -92,7 +92,7 @@
 }
 
 [data-theme="dark"] .stTabs [data-baseweb="tab-panel"] {
-  background-color: #262730;
+  background-color: #515364;
 }
 
 .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
@@ -101,8 +101,7 @@
 
 /* For the active tab */
 .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] [data-testid="stMarkdownContainer"] p {
-  color: white !important;
-  background-color: #a8a8bd;
+  color: white !important; 
 }
 
 .st-emotion-cache-atejua{
