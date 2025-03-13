@@ -326,63 +326,7 @@ class ErrorSelectorUI:
                             st.success("Selected")
                     
                     st.markdown("---")
-    
-    def render_simple_mode(self) -> List[str]:
-        """
-        Render a simplified problem area selection UI.
         
-        Returns:
-            List of selected problem areas
-        """
-        # Initialize selected problem areas if not in session state
-        if "problem_areas" not in st.session_state:
-            st.session_state.problem_areas = ["Style", "Logical", "Performance"]
-        
-        st.markdown("### Select Problem Areas")
-        st.markdown("Choose the types of issues you want to practice finding:")
-        
-        # Create a more visual selection with columns
-        col1, col2 = st.columns(2)
-        
-        problem_areas = []
-        
-        with col1:
-            if st.checkbox("Style Issues", value="Style" in st.session_state.problem_areas,
-                         help="Naming conventions, whitespace, formatting, documentation"):
-                problem_areas.append("Style")
-                
-            if st.checkbox("Logical Issues", value="Logical" in st.session_state.problem_areas,
-                         help="Logic flaws, incorrect conditionals, off-by-one errors"):
-                problem_areas.append("Logical")
-                
-            if st.checkbox("Performance Issues", value="Performance" in st.session_state.problem_areas,
-                         help="Inefficient code, unnecessary operations, resource leaks"):
-                problem_areas.append("Performance")
-        
-        with col2:
-            if st.checkbox("Security Issues", value="Security" in st.session_state.problem_areas,
-                         help="Potential vulnerabilities, unsafe operations"):
-                problem_areas.append("Security")
-                
-            if st.checkbox("Design Issues", value="Design" in st.session_state.problem_areas,
-                         help="Poor class design, code organization, maintainability problems"):
-                problem_areas.append("Design")
-        
-        # Update session state
-        st.session_state.problem_areas = problem_areas
-        
-        if not problem_areas:
-            st.warning("Please select at least one problem area.")
-            # Default to Style if nothing selected
-            st.session_state.problem_areas = ["Style"]
-            problem_areas = ["Style"]
-        
-        # Display selected areas
-        area_badges = " ".join([f'<span style="background-color: #e1f5fe; color: #0288d1; padding: 3px 8px; border-radius: 12px; margin-right: 5px; font-size: 0.8em;">{area}</span>' for area in problem_areas])
-        st.markdown(f"Selected: {area_badges}", unsafe_allow_html=True)
-        
-        return problem_areas
-    
     def render_mode_selector(self) -> str:
         """
         Render the mode selector UI.
@@ -441,9 +385,154 @@ class ErrorSelectorUI:
         
         return st.session_state.error_selection_mode
     
+    def render_simple_mode(self) -> List[str]:
+        """
+        Render a more professional problem area selection UI with improved styling.
+        
+        Returns:
+            List of selected problem areas
+        """
+        # Initialize selected problem areas if not in session state
+        if "problem_areas" not in st.session_state:
+            st.session_state.problem_areas = ["Style", "Logical", "Performance"]
+        
+        st.markdown("### Focus Areas for Code Review")
+        st.markdown("Select the categories of issues you want to find in the generated code:")
+        
+        # Create a more professional card-based selection
+        st.markdown("""
+        <style>
+        .problem-area-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+            margin-bottom: 20px;
+        }
+        .problem-area-card {
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .problem-area-card.selected {
+            border-color: #4c68d7;
+            background-color: rgba(76, 104, 215, 0.1);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        }
+        .problem-area-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .problem-area-title .icon {
+            color: #4c68d7;
+        }
+        .problem-area-description {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 0;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Problem area definitions with icons and descriptions
+        problem_areas_config = {
+            "Style": {
+                "icon": "✓",
+                "description": "Naming conventions, whitespace, formatting, and documentation issues"
+            },
+            "Logical": {
+                "icon": "🧠",
+                "description": "Logic flaws, incorrect conditionals, off-by-one errors, and algorithm issues"
+            },
+            "Performance": {
+                "icon": "⚡",
+                "description": "Inefficient code, unnecessary operations, resource leaks, and optimization issues"
+            },
+            "Security": {
+                "icon": "🔒",
+                "description": "Potential vulnerabilities, input validation issues, and unsafe operations"
+            },
+            "Design": {
+                "icon": "🏗️",
+                "description": "Poor class design, code organization, and maintainability problems"
+            }
+        }
+        
+        # Start of grid container
+        st.markdown('<div class="problem-area-grid">', unsafe_allow_html=True)
+        
+        # Initialize empty list for selected areas
+        problem_areas = []
+        
+        # Add cards for each problem area
+        for area, config in problem_areas_config.items():
+            is_selected = area in st.session_state.problem_areas
+            selected_class = "selected" if is_selected else ""
+            
+            st.markdown(f"""
+            <div class="problem-area-card {selected_class}" id="card-{area.lower()}" 
+                onclick="this.classList.toggle('selected'); 
+                        document.getElementById('checkbox-{area.lower()}').click();">
+                <div class="problem-area-title">
+                    {area} <span class="icon">{config['icon']}</span>
+                </div>
+                <p class="problem-area-description">{config['description']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Hidden checkbox to track selection state
+            if st.checkbox(area, value=is_selected, key=f"checkbox-{area.lower()}", label_visibility="collapsed"):
+                problem_areas.append(area)
+        
+        # End of grid container
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # JavaScript to make the cards clickable and sync with checkboxes
+        st.markdown("""
+        <script>
+        // Add event listeners for card selection
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.problem-area-card');
+            cards.forEach(card => {
+                card.addEventListener('click', function() {
+                    const id = this.id.replace('card-', '');
+                    const checkbox = document.getElementById(`checkbox-${id}`);
+                    if (checkbox) checkbox.click();
+                });
+            });
+        });
+        </script>
+        """, unsafe_allow_html=True)
+        
+        # Update session state
+        st.session_state.problem_areas = problem_areas
+        
+        if not problem_areas:
+            st.warning("Please select at least one problem area.")
+            # Default to Style if nothing selected
+            st.session_state.problem_areas = ["Style"]
+            problem_areas = ["Style"]
+        
+        # Display selected areas with professional badges
+        if problem_areas:
+            st.markdown("#### Selected Focus Areas:")
+            badges_html = ""
+            for area in problem_areas:
+                config = problem_areas_config.get(area, {"icon": ""})
+                badges_html += f'<span style="background-color: rgba(76, 104, 215, 0.1); color: #4c68d7; padding: 6px 12px; border-radius: 16px; margin-right: 10px; font-size: 0.9em; display: inline-flex; align-items: center; border: 1px solid rgba(76, 104, 215, 0.3);"><span style="margin-right: 5px;">{config["icon"]}</span> {area}</span>'
+            
+            st.markdown(f"<div style='margin-top: 10px;'>{badges_html}</div>", unsafe_allow_html=True)
+        
+        return problem_areas
+
     def render_code_params(self) -> Dict[str, str]:
         """
-        Render code generation parameters UI.
+        Render code generation parameters UI with improved professional appearance.
         
         Returns:
             Dictionary with code generation parameters
@@ -454,13 +543,47 @@ class ErrorSelectorUI:
         if "code_length" not in st.session_state:
             st.session_state.code_length = "Medium"
         
-        #st.markdown("### Code Options")
+        st.markdown("### Code Generation Parameters")
+        
+        # Add some custom styling for the parameters
+        st.markdown("""
+        <style>
+        .param-container {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        .param-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+        .param-description {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        .param-value {
+            font-weight: 500;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background-color: rgba(76, 104, 215, 0.1);
+            border-radius: 4px;
+            border-left: 3px solid #4c68d7;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        st.markdown('<div class="param-container">', unsafe_allow_html=True)
         
         # Create columns for a more compact layout
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("**Difficulty Level**")
+            st.markdown('<div class="param-title">Difficulty Level</div>', unsafe_allow_html=True)
+            st.markdown('<div class="param-description">Determines the complexity and subtlety of errors in the code</div>', unsafe_allow_html=True)
             difficulty_level = st.select_slider(
                 "Select difficulty",
                 options=["Easy", "Medium", "Hard"],
@@ -470,7 +593,8 @@ class ErrorSelectorUI:
             )
         
         with col2:
-            st.markdown("**Code Length**")
+            st.markdown('<div class="param-title">Code Length</div>', unsafe_allow_html=True)
+            st.markdown('<div class="param-description">Controls the size and complexity of the generated code</div>', unsafe_allow_html=True)
             code_length = st.select_slider(
                 "Select code length",
                 options=["Short", "Medium", "Long"],
@@ -483,20 +607,25 @@ class ErrorSelectorUI:
         st.session_state.difficulty_level = difficulty_level
         st.session_state.code_length = code_length
         
-        # Show explanation of selected options
+        # Show explanation of selected options with improved styling
         difficulty_explanation = {
-            "Easy": "Few basic errors, suitable for beginners",
-            "Medium": "More subtle errors, good for practice",
-            "Hard": "Complex and hard-to-spot errors"
+            "Easy": "Basic errors that are relatively obvious, suitable for beginners",
+            "Medium": "More subtle errors requiring careful code reading, good for practice",
+            "Hard": "Complex, hard-to-spot errors that might require deeper Java knowledge"
         }
         
         length_explanation = {
-            "Short": "~50 lines, 1 class, few methods",
-            "Medium": "~100 lines, 1-2 classes",
-            "Long": "~200 lines, multiple classes"
+            "Short": "~50 lines of code, typically 1 class with a few methods",
+            "Medium": "~100-150 lines, 1-2 classes with multiple methods",
+            "Long": "~200+ lines, multiple classes with complex relationships"
         }
         
-        st.markdown(f"**Selected:** {difficulty_level} difficulty ({difficulty_explanation[difficulty_level]}), {code_length} length ({length_explanation[code_length]})")
+        st.markdown('<div class="param-value">', unsafe_allow_html=True)
+        st.markdown(f"**Difficulty:** {difficulty_level} - {difficulty_explanation[difficulty_level]}", unsafe_allow_html=True)
+        st.markdown(f"**Length:** {code_length} - {length_explanation[code_length]}", unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
         
         return {
             "difficulty_level": difficulty_level.lower(),

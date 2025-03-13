@@ -1,128 +1,96 @@
-/* Tab styling with improved visuals */
+/* Professional tab styling with modern appearance */
 .stTabs [data-baseweb="tab-list"] {
-    gap: 10px;
-    background-color: var(--card-bg);
-    padding: 10px 10px 0 10px;
-    border-radius: 10px 10px 0 0;
-    border: 1px solid var(--border);
-    border-bottom: none;
-  }
-  
-  .stTabs [data-baseweb="tab"] {
-    height: 50px;
-    white-space: pre-wrap;
-    background-color: rgba(76, 104, 215, 0.1);
-    border-radius: 8px 8px 0px 0px;
-    padding: 8px 16px;
-    font-weight: 500;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .stTabs [aria-selected="true"] {
-    background-color: var(--primary);
-    color: white;
-    box-shadow: 0 2px 4px var(--shadow);
-    transform: translateY(-3px);
-  }
-  
-  .stTabs [data-baseweb="tab"]:hover {
-    background-color: rgba(76, 104, 215, 0.2);
-    transform: translateY(-2px);
-  }
-  
-  .stTabs [data-baseweb="tab-panel"] {
-    background-color: var(--card-bg);
-    padding: 20px;
-    border: 1px solid var(--border);
-    border-radius: 0px 0px 10px 10px;
-    box-shadow: 0 2px 4px var(--shadow);
-  }
-  
-  /* Tab label components */
-  .tab-label {
-    display: flex;
-    align-items: center;
-  }
-  
-  .tab-number {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    background-color: rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    margin-right: 8px;
-    font-weight: bold;
-  }
-  
-  [aria-selected="false"] .tab-number {
-    background-color: rgba(76, 104, 215, 0.2);
-  }
+  gap: 10px;
+  background-color: var(--card-bg);
+  padding: 16px 16px 0 16px;
+  border-radius: 10px 10px 0 0;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+}
 
+.stTabs [data-baseweb="tab"] {
+  height: 54px;
+  white-space: pre-wrap;
+  background-color: rgba(76, 104, 215, 0.08);
+  border-radius: 8px 8px 0px 0px;
+  padding: 8px 24px;
+  font-weight: 500;
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-bottom: none;
+  font-size: 15px;
+  position: relative;
+  padding-left: 48px !important; /* Make room for the number */
+  color: var(--text-secondary);
+}
 
+.stTabs [data-baseweb="tab"]::before {
+  position: absolute;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background-color: rgba(76, 104, 215, 0.15);
+  border-radius: 50%;
+  font-weight: bold;
+  content: attr(data-step-number);
+  color: var(--primary);
+}
 
-  /* ***********************************Style the tab list container */
-  .stTabs [data-baseweb="tab-list"] {
-      gap: 10px;
-      background-color: #262730;
-      padding: 10px 10px 0 10px;
-      border-radius: 10px 10px 0 0;
-  }
-  
-  /* Style individual tabs */
-  .stTabs [data-baseweb="tab"] {
-      height: 50px;
-      background-color: #3b4253;
-      border-radius: 8px 8px 0px 0px;
-      padding: 8px 16px;
-      font-weight: 500;
-      position: relative;
-      padding-left: 40px !important; /* Make room for the number */
-  }
-  
-  /* Style the active tab */
-  .stTabs [aria-selected="true"] {
-      background-color: #4c68d7;
-      color: white;
-      transform: translateY(-3px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  }
-  
-  /* Add tab numbers using CSS counter */
-  .stTabs [data-baseweb="tab"]::before {
-      position: absolute;
-      left: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      background-color: rgba(255, 255, 255, 0.2);
-      border-radius: 50%;
-      font-weight: bold;
-  }
-  
-  /* Set specific tab numbers */
-  .stTabs [data-baseweb="tab"]:nth-child(1)::before {
-      content: "1";
-  }
-  
-  .stTabs [data-baseweb="tab"]:nth-child(2)::before {
-      content: "2";
-  }
-  
-  .stTabs [data-baseweb="tab"]:nth-child(3)::before {
-      content: "3";
-  }
-  
-  .stTabs [data-baseweb="tab"]:nth-child(4)::before {
-      content: "4";
-  }
-  
-  .stTabs [data-baseweb="tab"]:nth-child(5)::before {
-      content: "5";
-  }
+.stTabs [data-baseweb="tab"]:nth-child(1)::before {
+  content: "1";
+}
+
+.stTabs [data-baseweb="tab"]:nth-child(2)::before {
+  content: "2";
+}
+
+.stTabs [data-baseweb="tab"]:nth-child(3)::before {
+  content: "3";
+}
+
+.stTabs [aria-selected="true"] {
+  background-color: var(--primary);
+  color: white;
+  box-shadow: 0 2px 8px var(--shadow);
+  transform: translateY(-3px);
+  border: 1px solid var(--primary-dark);
+  border-bottom: none;
+}
+
+.stTabs [aria-selected="true"]::before {
+  background-color: rgba(255, 255, 255, 0.25);
+  color: white;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+  background-color: rgba(76, 104, 215, 0.2);
+  transform: translateY(-2px);
+}
+
+.stTabs [data-baseweb="tab-panel"] {
+  background-color: var(--card-bg);
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 0px 0px 10px 10px;
+  box-shadow: 0 2px 10px var(--shadow);
+}
+
+/* Dark mode refinements */
+[data-theme="dark"] .stTabs [data-baseweb="tab"] {
+  background-color: rgba(76, 104, 215, 0.15);
+}
+
+[data-theme="dark"] .stTabs [data-baseweb="tab-list"] {
+  background-color: #1e1e24;
+}
+
+[data-theme="dark"] .stTabs [data-baseweb="tab-panel"] {
+  background-color: #262730;
+}

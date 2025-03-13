@@ -155,53 +155,97 @@ def generate_code_problem(workflow: JavaCodeReviewGraph,
 
 def process_student_review(workflow: JavaCodeReviewGraph, student_review: str):
     """
-    Process a student review with progress indicator.
+    Process a student review with progress indicator and improved error handling.
+    
+    Args:
+        workflow: The JavaCodeReviewGraph workflow instance
+        student_review: The student's review text
+        
+    Returns:
+        bool: True if successful, False otherwise
     """
     # Show progress during analysis
     with st.status("Processing your review...", expanded=True) as status:
         try:
             # Get current state
+            if not hasattr(st.session_state, 'workflow_state'):
+                status.update(label="Error: Workflow state not initialized", state="error")
+                st.session_state.error = "Please generate a code problem first"
+                return False
+                
             state = st.session_state.workflow_state
+            
+            # Check if code snippet exists
+            if not state.code_snippet:
+                status.update(label="Error: No code snippet available", state="error")
+                st.session_state.error = "Please generate a code problem first"
+                return False
+            
+            # Check if student review is empty
+            if not student_review.strip():
+                status.update(label="Error: Review cannot be empty", state="error")
+                st.session_state.error = "Please enter your review before submitting"
+                return False
             
             # Store the current review in session state for display consistency
             current_iteration = state.current_iteration
             st.session_state[f"submitted_review_{current_iteration}"] = student_review
             
-            # Submit the review and update the state
+            # Update status
             status.update(label="Analyzing your review...", state="running")
+            
+            # Log submission attempt
+            logger.info(f"Submitting review (iteration {current_iteration}): {student_review[:100]}...")
+            
+            # Submit the review and update the state
             updated_state = workflow.submit_review(state, student_review)
             
             # Check for errors
             if updated_state.error:
                 status.update(label=f"Error: {updated_state.error}", state="error")
                 st.session_state.error = updated_state.error
+                logger.error(f"Error during review analysis: {updated_state.error}")
                 return False
             
             # Update session state
             st.session_state.workflow_state = updated_state
+            
+            # Log successful analysis
+            logger.info(f"Review analysis complete for iteration {current_iteration}")
             
             # Check if we should generate summary
             if workflow.should_continue_review(updated_state) == "generate_summary":
                 status.update(label="Generating final feedback...", state="running")
                 
                 # Run the summary generation node
-                final_state = workflow.generate_summary_node(updated_state)
-                st.session_state.workflow_state = final_state
-                
-                # Move to the analysis tab
-                st.session_state.active_tab = 2
-            
-            status.update(label="Analysis complete!", state="complete")
+                try:
+                    final_state = workflow.generate_summary_node(updated_state)
+                    st.session_state.workflow_state = final_state
+                    
+                    # Move to the analysis tab
+                    st.session_state.active_tab = 2
+                    
+                    status.update(label="Analysis complete! Moving to Feedback tab...", state="complete")
+                except Exception as e:
+                    error_msg = f"Error generating final feedback: {str(e)}"
+                    logger.error(error_msg)
+                    status.update(label=error_msg, state="error")
+                    st.session_state.error = error_msg
+                    return False
+            else:
+                status.update(label="Analysis complete!", state="complete")
             
             # Force a rerun to update the UI
+            time.sleep(0.5)  # Short delay to ensure the status message is visible
             st.rerun()
             
             return True
             
         except Exception as e:
-            logger.error(f"Error processing student review: {str(e)}")
-            status.update(label=f"Error: {str(e)}", state="error")
-            st.session_state.error = f"Error processing student review: {str(e)}"
+            error_msg = f"Error processing student review: {str(e)}"
+            logger.error(error_msg)
+            status.update(label=error_msg, state="error")
+            st.session_state.error = error_msg
             return False
 
 def render_sidebar(llm_manager: LLMManager, workflow: JavaCodeReviewGraph):
@@ -604,26 +648,19 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui):
         st.markdown('</div>', unsafe_allow_html=True)
 
 def render_review_tab(workflow, code_display_ui):
-    """Render the review submission tab."""
+    """Render the review submission tab with enhanced UI."""
     state = st.session_state.workflow_state
     
     if not state.code_snippet:
         st.info("Please generate a code problem first in the 'Generate Code Problem' tab.")
         return
     
-    # Code display section
-    #st.markdown('<div class="content-section">', unsafe_allow_html=True)
+    # Professional code display section
     code_display_ui.render_code_display(state.code_snippet.code)
-    st.markdown('</div>', unsafe_allow_html=True)
     
-    # Review submission section
-    #st.markdown('<div class="content-section">', unsafe_allow_html=True)
-    
-    # Submission callback
+    # Enhanced submission callback
     def handle_review_submission(student_review):
-        success = process_student_review(workflow, student_review)
-        if success:
-            st.rerun()
+        return process_student_review(workflow, student_review)
     
     # Get the latest review and guidance if available
     latest_review = state.review_history[-1] if state.review_history else None
@@ -639,13 +676,10 @@ def render_review_tab(workflow, code_display_ui):
         targeted_guidance=targeted_guidance,
         review_analysis=latest_analysis
     )
-    
-    st.markdown('</div>', unsafe_allow_html=True)
 
 def create_enhanced_tabs(tab_labels):
     """
-    Create enhanced tabs with CSS-only styling.
-    No HTML in tab labels - just clean text.
+    Create enhanced tabs with professional styling.
     
     Args:
         tab_labels: List of tab labels to display
@@ -653,7 +687,7 @@ def create_enhanced_tabs(tab_labels):
     Returns:
         List of streamlit tab objects
     """
-    # Simply clean the labels - NO HTML
+    # Clean the labels - NO HTML
     import re
     clean_labels = []
     for label in tab_labels:
@@ -664,26 +698,46 @@ def create_enhanced_tabs(tab_labels):
     # Create the tabs with clean labels (no HTML)
     tabs = st.tabs(clean_labels)
     
+    # Apply custom HTML/CSS to style the tabs
+    for i, tab in enumerate(tabs):
+        # This is just to set the attributes - won't actually render
+        # because we're using the clean labels above
+        st.markdown(
+            f"""
+            <script>
+                // Set the step number as a data attribute
+                document.querySelectorAll('[data-baseweb="tab"]')[{i}].setAttribute('data-step-number', '{i+1}');
+            </script>
+            """,
+            unsafe_allow_html=True
+        )
+    
     return tabs
 
 def render_feedback_tab(workflow, feedback_display_ui):
-    """Render the feedback and analysis tab."""
+    """Render the feedback and analysis tab with enhanced visuals."""
     state = st.session_state.workflow_state
     
     if not state.comparison_report and not state.review_summary:
         st.info("Please submit your review in the 'Submit Review' tab first.")
         return
     
-    # Reset callback
+    # Reset callback with confirmation
     def handle_reset():
-        # Create a new workflow state
-        st.session_state.workflow_state = WorkflowState()
-        
-        # Reset active tab
-        st.session_state.active_tab = 0
-        
-        # Rerun the app
-        st.rerun()
+        # Create a confirmation dialog
+        if st.session_state.get("confirm_reset", False) or st.button("Confirm Reset", key="confirm_reset_btn"):
+            # Create a new workflow state
+            st.session_state.workflow_state = WorkflowState()
+            
+            # Reset active tab
+            st.session_state.active_tab = 0
+            
+            # Reset confirmation flag
+            if "confirm_reset" in st.session_state:
+                del st.session_state.confirm_reset
+            
+            # Rerun the app
+            st.rerun()
     
     # Get the latest review analysis
     latest_review = state.review_history[-1] if state.review_history else None
@@ -699,7 +753,6 @@ def render_feedback_tab(workflow, feedback_display_ui):
         })
     
     # Display feedback results
-    #st.markdown('<div class="content-section">', unsafe_allow_html=True)
     feedback_display_ui.render_results(
         comparison_report=state.comparison_report,
         review_summary=state.review_summary,
@@ -707,10 +760,52 @@ def render_feedback_tab(workflow, feedback_display_ui):
         review_history=review_history,
         on_reset_callback=handle_reset
     )
-    st.markdown('</div>', unsafe_allow_html=True)
+
+def render_model_manager_sidebar(llm_manager, model_manager_ui):
+    """Render the improved model manager in the sidebar."""
+    # Get available models
+    available_models = llm_manager.get_available_models()
+    
+    # Filter out only pulled models for selection
+    model_options = [model["id"] for model in available_models if model["pulled"]]
+    
+    if not model_options:
+        st.warning("No models available. Please pull at least one model in the Models tab.")
+        return {}
+    
+    # Render the enhanced model selection table
+    model_selections = model_manager_ui.render_model_selection_table(model_options)
+    
+    # Check for model pulls in progress
+    if st.session_state.model_operations["pulling"]:
+        model_name = st.session_state.model_operations["current_pull"]
+        
+        # Create a progress indicator
+        st.subheader(f"Pulling model: {model_name}")
+        progress_bar = st.progress(0)
+        
+        # Start the download in a separate thread
+        if st.session_state.model_operations["pull_progress"] == 0:
+            success = llm_manager.download_ollama_model(model_name)
+            
+            if success:
+                st.session_state.model_operations["pulling"] = False
+                st.session_state.model_operations["last_pulled"] = model_name
+                st.session_state.model_operations["error"] = None
+                st.rerun()
+            else:
+                st.session_state.model_operations["pulling"] = False
+                st.session_state.model_operations["error"] = f"Failed to pull model: {model_name}"
+                st.rerun()
+        
+        # Update progress bar
+        progress_status = llm_manager.get_pull_status(model_name)
+        progress_bar.progress(progress_status.get("progress", 0) / 100)
+    
+    return model_selections
 
 def main():
-    """Main application function."""
+    """Enhanced main application function."""
     # Initialize session state
     init_session_state()
     
@@ -722,13 +817,18 @@ def main():
     error_selector_ui = ErrorSelectorUI()
     code_display_ui = CodeDisplayUI()
     feedback_display_ui = FeedbackDisplayUI()
+    model_manager_ui = ModelManagerUI(llm_manager)
     
     # Render sidebar
     render_sidebar(llm_manager, workflow)
     
-    # Header
-    st.markdown("# Java Code Review Training System")
-    st.caption("Learn and practice Java code review skills with generated exercises")
+    # Header with improved styling
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #4c68d7; margin-bottom: 5px;">Java Code Review Training System</h1>
+        <p style="font-size: 1.1rem; color: #666;">Learn and practice Java code review skills with AI-generated exercises</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Display error message if there's an error
     if st.session_state.error:

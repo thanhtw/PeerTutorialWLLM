@@ -86,13 +86,13 @@ class CodeDisplayUI:
         return "\n".join(numbered_lines)
     
     def render_review_input(self, student_review: str = "", 
-                          on_submit_callback: Callable[[str], None] = None,
-                          iteration_count: int = 1,
-                          max_iterations: int = 3,
-                          targeted_guidance: str = None,
-                          review_analysis: Dict[str, Any] = None) -> None:
+                      on_submit_callback: Callable[[str], None] = None,
+                      iteration_count: int = 1,
+                      max_iterations: int = 3,
+                      targeted_guidance: str = None,
+                      review_analysis: Dict[str, Any] = None) -> None:
         """
-        Render a text area for student review input with guidance.
+        Render a professional text area for student review input with guidance.
         
         Args:
             student_review: Initial value for the text area
@@ -102,16 +102,125 @@ class CodeDisplayUI:
             targeted_guidance: Optional guidance for the student
             review_analysis: Optional analysis of previous review attempt
         """
-        # Show iteration badge if not the first iteration
+        # Add professional styling
+        st.markdown("""
+        <style>
+        .review-container {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px var(--shadow);
+        }
+        
+        .review-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        
+        .review-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        
+        .iteration-badge {
+            display: inline-flex;
+            align-items: center;
+            background-color: var(--primary);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .guidance-box {
+            background-color: rgba(76, 104, 215, 0.1);
+            border-left: 4px solid var(--primary);
+            padding: 16px;
+            margin: 15px 0;
+            border-radius: 5px;
+            color: var(--text);
+        }
+        
+        .guidance-title {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .guidance-icon {
+            margin-right: 8px;
+            font-size: 1.1rem;
+        }
+        
+        .analysis-box {
+            background-color: rgba(255, 193, 7, 0.1);
+            border-left: 4px solid var(--warning);
+            padding: 16px;
+            margin: 15px 0;
+            border-radius: 5px;
+            color: var(--text);
+        }
+        
+        .review-history-box {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 10px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        
+        .review-textarea textarea {
+            background-color: var(--card-bg) !important;
+            border: 1px solid var(--border) !important;
+            border-radius: 5px !important;
+            padding: 12px !important;
+            font-family: 'Roboto Mono', monospace !important;
+            font-size: 0.9rem !important;
+            min-height: 250px !important;
+            color: var(--text) !important;
+        }
+        
+        .button-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .submit-button {
+            flex: 3;
+        }
+        
+        .clear-button {
+            flex: 1;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Review container start
+        st.markdown('<div class="review-container">', unsafe_allow_html=True)
+        
+        # Review header with iteration badge if not the first iteration
         if iteration_count > 1:
             st.markdown(
-                f"<h3>Submit Your Code Review "
-                f"<span class='iteration-badge'>Attempt {iteration_count} of "
-                f"{max_iterations}</span></h3>", 
+                f'<div class="review-header">'
+                f'<span class="review-title">Submit Your Code Review</span>'
+                f'<span class="iteration-badge">Attempt {iteration_count} of {max_iterations}</span>'
+                f'</div>', 
                 unsafe_allow_html=True
             )
         else:
-            st.header("Submit Your Code Review")
+            st.markdown('<div class="review-header"><span class="review-title">Submit Your Code Review</span></div>', unsafe_allow_html=True)
         
         # Create a layout for guidance and history
         if targeted_guidance or (review_analysis and iteration_count > 1):
@@ -122,7 +231,7 @@ class CodeDisplayUI:
                 if targeted_guidance and iteration_count > 1:
                     st.markdown(
                         f'<div class="guidance-box">'
-                        f'<h4>🎯 Review Guidance</h4>'
+                        f'<div class="guidance-title"><span class="guidance-icon">🎯</span> Review Guidance</div>'
                         f'{targeted_guidance}'
                         f'</div>',
                         unsafe_allow_html=True
@@ -131,8 +240,8 @@ class CodeDisplayUI:
                     # Show previous attempt results if available
                     if review_analysis:
                         st.markdown(
-                            f'<div class="warning-box">'
-                            f'<h4>⚠️ Previous Results</h4>'
+                            f'<div class="analysis-box">'
+                            f'<div class="guidance-title"><span class="guidance-icon">📊</span> Previous Results</div>'
                             f'You identified {review_analysis.get("identified_count", 0)} of '
                             f'{review_analysis.get("total_problems", 0)} issues '
                             f'({review_analysis.get("identified_percentage", 0):.1f}%). '
@@ -144,29 +253,35 @@ class CodeDisplayUI:
             # Display previous review if available
             with history_col:
                 if student_review and iteration_count > 1:
-                    st.markdown("#### Previous Review")
+                    st.markdown('<div class="guidance-title"><span class="guidance-icon">📝</span> Previous Review</div>', unsafe_allow_html=True)
                     st.markdown(
-                        f'<div class="review-box" style="max-height: 200px; overflow-y: auto;">'
-                        f'<pre style="margin: 0; white-space: pre-wrap;">{student_review}</pre>'
+                        f'<div class="review-history-box">'
+                        f'<pre style="margin: 0; white-space: pre-wrap; font-size: 0.85rem; color: var(--text);">{student_review}</pre>'
                         f'</div>',
                         unsafe_allow_html=True
                     )
         
         # Display review guidelines
-        with st.expander("📝 Review Guidelines", expanded=False):
+        with st.expander("📋 Review Guidelines", expanded=False):
             st.markdown("""
             ### How to Write an Effective Code Review:
             
-            1. **Be Specific**: Point out exact lines or issues
-            2. **Be Constructive**: Suggest improvements, not just problems
-            3. **Check for**:
-               - Syntax errors
-               - Logical errors
-               - Naming conventions
-               - Code style and formatting
-               - Documentation
-               - Potential bugs
-            4. **Format Your Review**: Organize your comments by issue type
+            1. **Be Specific**: Point out exact lines or areas where problems occur
+            2. **Be Comprehensive**: Look for different types of issues
+            3. **Be Constructive**: Suggest improvements, not just criticisms
+            4. **Check for**:
+            - Syntax and compilation errors
+            - Logical errors and bugs
+            - Naming conventions and coding standards
+            - Code style and formatting issues
+            - Documentation completeness
+            - Potential security vulnerabilities
+            - Efficiency and performance concerns
+            5. **Format Your Review**: Use a consistent format like:
+            ```
+            Line X: [Issue type] - Description of the issue
+            Line Y: [Issue type] - Description of the issue
+            ```
             """)
         
         # Get or update the student review
@@ -186,42 +301,58 @@ class CodeDisplayUI:
             else:
                 initial_value = ""  # Start fresh in new iterations
         
-        # Get or update the student review
+        # Get or update the student review with custom styling
         student_review_input = st.text_area(
             "Enter your review comments here",
             value=initial_value, 
             height=300,
             key=text_area_key,
-            placeholder="Example: Line 15: The variable 'cnt' uses poor naming convention. Consider using a more descriptive name like 'counter'.",
-            label_visibility="collapsed"
+            placeholder="Example:\nLine 15: [Naming Convention] - The variable 'cnt' uses poor naming. Consider using 'counter' instead.\nLine 27: [Logic Error] - The loop condition should use '<=' instead of '<' to include the boundary value.",
+            label_visibility="collapsed",
+            help="Provide detailed feedback on the code. Be specific about line numbers and issues you've identified."
         )
         
-        # Submit controls with layout
-        submit_col1, submit_col2 = st.columns([4, 1])
+        # Create button container for better layout
+        st.markdown('<div class="button-container">', unsafe_allow_html=True)
         
-        # Submit button
+        # Submit button with professional styling
         submit_text = "Submit Review" if iteration_count == 1 else f"Submit Review (Attempt {iteration_count}/{max_iterations})"
         
-        with submit_col1:
-            submit_button = st.button(submit_text, type="primary", use_container_width=True)
+        col1, col2 = st.columns([4, 1])
         
-        with submit_col2:
+        with col1:
+            st.markdown('<div class="submit-button">', unsafe_allow_html=True)
+            submit_button = st.button(submit_text, type="primary", use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown('<div class="clear-button">', unsafe_allow_html=True)
             clear_button = st.button("Clear", use_container_width=True)
-            
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)  # Close button container
+        
+        # Handle clear button
         if clear_button:
             st.session_state[text_area_key] = ""
             st.rerun()
         
+        # Handle submit button with improved validation
         if submit_button:
             if not student_review_input.strip():
-                st.warning("Please enter your review before submitting.")
+                st.error("Please enter your review before submitting.")
             elif on_submit_callback:
-                # Call the submission callback
-                on_submit_callback(student_review_input)
-                
-                # Store the submitted review in session state for this iteration
-                if f"submitted_review_{iteration_count}" not in st.session_state:
-                    st.session_state[f"submitted_review_{iteration_count}"] = student_review_input
+                # Show a spinner while processing
+                with st.spinner("Processing your review..."):
+                    # Call the submission callback
+                    on_submit_callback(student_review_input)
+                    
+                    # Store the submitted review in session state for this iteration
+                    if f"submitted_review_{iteration_count}" not in st.session_state:
+                        st.session_state[f"submitted_review_{iteration_count}"] = student_review_input
+        
+        # Close review container
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 

@@ -101,7 +101,6 @@ class ModelManagerUI:
             st.info("No models found. Pull a model to get started.")
         else:
             # Create a filtered list of models to display
-             # Create a filtered list of models to display
             display_models = []
             for model in available_models:
                 display_models.append({
@@ -196,230 +195,9 @@ class ModelManagerUI:
         if not model_options:
             st.warning("No models are available. Please pull at least one model.")
         else:
-            # Create a table-style layout for model selection
-            st.markdown("""
-                <table class="model-selection-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 30%;">Purpose</th>
-                            <th>Selected Model</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><strong>Code Generation</strong><br><span class="purpose-description">For creating Java code problems</span></td>
-                            <td id="generative-model-cell"></td>
-                        </tr>
-                        <tr>
-                            <td><strong>Review Analysis</strong><br><span class="purpose-description">For analyzing student reviews</span></td>
-                            <td id="review-model-cell"></td>
-                        </tr>
-                        <tr>
-                            <td><strong>Summary Generation</strong><br><span class="purpose-description">For generating feedback summaries</span></td>
-                            <td id="summary-model-cell"></td>
-                        </tr>
-                        <tr>
-                            <td><strong>Comparison</strong><br><span class="purpose-description">For comparing student reviews with actual issues</span></td>
-                            <td id="compare-model-cell"></td>
-                        </tr>
-                    </tbody>
-                </table>
-            """, unsafe_allow_html=True)
+            # Use the new improved model selection table
+            model_selections = self.render_model_selection_table(model_options)
             
-            # Add model selection dropdowns to table cells
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.markdown('<div id="generative-model-cell">', unsafe_allow_html=True)
-                generative_model = st.selectbox(
-                    "Model for generating code problems",
-                    options=model_options,
-                    index=model_options.index(st.session_state.model_selections["generative"]) 
-                    if st.session_state.model_selections["generative"] in model_options else 0,
-                    key="generative_model_select",
-                    label_visibility="collapsed"
-                )
-                st.session_state.model_selections["generative"] = generative_model
-            
-            with col2:
-                st.markdown('<div id="review-model-cell">', unsafe_allow_html=True)
-                review_model = st.selectbox(
-                    "Model for analyzing student reviews",
-                    options=model_options,
-                    index=model_options.index(st.session_state.model_selections["review"]) 
-                    if st.session_state.model_selections["review"] in model_options else 0,
-                    key="review_model_select",
-                    label_visibility="collapsed"
-                )
-                st.session_state.model_selections["review"] = review_model
-            
-            with col3:
-                st.markdown('<div id="summary-model-cell">', unsafe_allow_html=True)
-                summary_model = st.selectbox(
-                    "Model for generating feedback summaries",
-                    options=model_options,
-                    index=model_options.index(st.session_state.model_selections["summary"]) 
-                    if st.session_state.model_selections["summary"] in model_options else 0,
-                    key="summary_model_select",
-                    label_visibility="collapsed"
-                )
-                st.session_state.model_selections["summary"] = summary_model
-            
-            with col4:
-                st.markdown('<div id="compare-model-cell">', unsafe_allow_html=True)
-                compare_model = st.selectbox(
-                    "Model for comparing student reviews with actual issues",
-                    options=model_options,
-                    index=model_options.index(st.session_state.model_selections["compare"]) 
-                    if st.session_state.model_selections["compare"] in model_options else 0,
-                    key="compare_model_select",
-                    label_visibility="collapsed"
-                )
-                st.session_state.model_selections["compare"] = compare_model
-            
-            # Advanced settings expander
-            with st.expander("Advanced Settings", expanded=False):
-                # Enable/disable reasoning mode
-                reasoning_mode = st.checkbox(
-                    "Enable Reasoning Mode",
-                    value=os.getenv("REASONING_MODE", "false").lower() == "true",
-                    help="When enabled, models will use step-by-step reasoning (may use more tokens)"
-                )
-                
-                # Temperature settings
-                st.subheader("Temperature Settings")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    generative_temp = st.slider(
-                        "Generation Temperature",
-                        min_value=0.0,
-                        max_value=1.0,
-                        value=float(os.getenv("GENERATIVE_TEMPERATURE", "0.7")),
-                        step=0.1,
-                        help="Higher temperature = more creative but less predictable"
-                    )
-                    
-                    review_temp = st.slider(
-                        "Review Temperature",
-                        min_value=0.0,
-                        max_value=1.0,
-                        value=float(os.getenv("REVIEW_TEMPERATURE", "0.7")),
-                        step=0.1
-                    )
-                
-                with col2:
-                    summary_temp = st.slider(
-                        "Summary Temperature",
-                        min_value=0.0,
-                        max_value=1.0,
-                        value=float(os.getenv("SUMMARY_TEMPERATURE", "0.7")),
-                        step=0.1
-                    )
-                    
-                    compare_temp = st.slider(
-                        "Compare Temperature",
-                        min_value=0.0,
-                        max_value=1.0,
-                        value=float(os.getenv("COMPARE_TEMPERATURE", "0.7")),
-                        step=0.1
-                    )
-                
-                # Reasoning temperature
-                reasoning_temp = st.slider(
-                    "Reasoning Temperature",
-                    min_value=0.0,
-                    max_value=1.0,
-                    value=float(os.getenv("REASONING_TEMPERATURE", "0.1")),
-                    step=0.1,
-                    help="Lower values give more predictable responses in reasoning mode"
-                )
-                
-                # Save settings button
-                if st.button("Save Settings to .env", type="primary"):
-                    # Update environment variables in memory
-                    os.environ["GENERATIVE_MODEL"] = st.session_state.model_selections["generative"]
-                    os.environ["REVIEW_MODEL"] = st.session_state.model_selections["review"]
-                    os.environ["SUMMARY_MODEL"] = st.session_state.model_selections["summary"]
-                    os.environ["COMPARE_MODEL"] = st.session_state.model_selections["compare"]
-                    
-                    os.environ["GENERATIVE_TEMPERATURE"] = str(generative_temp)
-                    os.environ["REVIEW_TEMPERATURE"] = str(review_temp)
-                    os.environ["SUMMARY_TEMPERATURE"] = str(summary_temp)
-                    os.environ["COMPARE_TEMPERATURE"] = str(compare_temp)
-                    
-                    os.environ["REASONING_MODE"] = str(reasoning_mode).lower()
-                    os.environ["REASONING_TEMPERATURE"] = str(reasoning_temp)
-                    
-                    # Update .env file
-                    try:
-                        env_path = ".env"
-                        if os.path.exists(env_path):
-                            # Read existing .env content
-                            with open(env_path, "r") as f:
-                                lines = f.readlines()
-                            
-                            # Update existing values or add new ones
-                            env_vars = {
-                                "GENERATIVE_MODEL": st.session_state.model_selections["generative"],
-                                "REVIEW_MODEL": st.session_state.model_selections["review"],
-                                "SUMMARY_MODEL": st.session_state.model_selections["summary"],
-                                "COMPARE_MODEL": st.session_state.model_selections["compare"],
-                                "GENERATIVE_TEMPERATURE": str(generative_temp),
-                                "REVIEW_TEMPERATURE": str(review_temp),
-                                "SUMMARY_TEMPERATURE": str(summary_temp),
-                                "COMPARE_TEMPERATURE": str(compare_temp),
-                                "REASONING_MODE": str(reasoning_mode).lower(),
-                                "REASONING_TEMPERATURE": str(reasoning_temp)
-                            }
-                            
-                            # Update existing variables
-                            updated_lines = []
-                            updated_vars = set()
-                            
-                            for line in lines:
-                                updated = False
-                                for var_name, var_value in env_vars.items():
-                                    if line.startswith(f"{var_name}="):
-                                        updated_lines.append(f"{var_name}={var_value}\n")
-                                        updated_vars.add(var_name)
-                                        updated = True
-                                        break
-                                
-                                if not updated:
-                                    updated_lines.append(line)
-                            
-                            # Add new variables that weren't updated
-                            for var_name, var_value in env_vars.items():
-                                if var_name not in updated_vars:
-                                    updated_lines.append(f"{var_name}={var_value}\n")
-                            
-                            # Write the updated content back
-                            with open(env_path, "w") as f:
-                                f.writelines(updated_lines)
-                            
-                            st.success("Settings saved to .env file!")
-                        else:
-                            # Create a new .env file
-                            with open(env_path, "w") as f:
-                                f.write(f"OLLAMA_BASE_URL={self.llm_manager.ollama_base_url}\n")
-                                f.write(f"DEFAULT_MODEL={self.llm_manager.default_model}\n")
-                                f.write(f"GENERATIVE_MODEL={st.session_state.model_selections['generative']}\n")
-                                f.write(f"REVIEW_MODEL={st.session_state.model_selections['review']}\n")
-                                f.write(f"SUMMARY_MODEL={st.session_state.model_selections['summary']}\n")
-                                f.write(f"COMPARE_MODEL={st.session_state.model_selections['compare']}\n")
-                                f.write(f"GENERATIVE_TEMPERATURE={generative_temp}\n")
-                                f.write(f"REVIEW_TEMPERATURE={review_temp}\n")
-                                f.write(f"SUMMARY_TEMPERATURE={summary_temp}\n")
-                                f.write(f"COMPARE_TEMPERATURE={compare_temp}\n")
-                                f.write(f"REASONING_MODE={str(reasoning_mode).lower()}\n")
-                                f.write(f"REASONING_TEMPERATURE={reasoning_temp}\n")
-                            
-                            st.success("Created new .env file with settings!")
-                    except Exception as e:
-                        st.error(f"Error saving settings: {str(e)}")
-        
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Return the current model selections
@@ -477,3 +255,173 @@ class ModelManagerUI:
                     st.session_state.model_operations["current_pull"] = model["id"]
                     st.session_state.model_operations["pull_progress"] = 0
                     st.rerun()
+
+    def render_model_selection_table(self, model_options):
+        """
+        Render a professionally styled model selection table
+        
+        Args:
+            model_options: List of available model options
+        
+        Returns:
+            Dictionary with selected models for each role
+        """
+        # Custom CSS for professional table styling
+        st.markdown("""
+        <style>
+        .model-selection-container {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .model-role {
+            margin-bottom: 24px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            padding: 16px;
+            transition: box-shadow 0.2s ease;
+            background-color: rgba(255,255,255,0.02);
+        }
+        
+        .model-role:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        
+        .role-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .role-title {
+            font-weight: 600;
+            font-size: 1.05em;
+            color: var(--text);
+        }
+        
+        .role-icon {
+            color: var(--primary);
+            font-size: 1.2em;
+            margin-right: 8px;
+        }
+        
+        .role-description {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        
+        .selected-model {
+            background-color: rgba(76, 104, 215, 0.08);
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-top: 10px;
+            border-left: 3px solid var(--primary);
+            font-size: 0.9em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .model-badge {
+            display: inline-block;
+            font-size: 0.75em;
+            padding: 3px 8px;
+            border-radius: 12px;
+            background-color: rgba(76, 104, 215, 0.2);
+            color: var(--primary);
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<h3>Model Configuration</h3>", unsafe_allow_html=True)
+        st.markdown("<p>Select which model to use for each stage of the code review process:</p>", unsafe_allow_html=True)
+        
+        # Start container for model roles
+        st.markdown('<div class="model-selection-container">', unsafe_allow_html=True)
+        
+        # Define role configurations with icons and descriptions
+        role_configs = {
+            "generative": {
+                "title": "Code Generation",
+                "icon": "💻",
+                "description": "Creates Java code with intentional errors for review practice",
+                "selector_id": "generative-model-cell"
+            },
+            "review": {
+                "title": "Review Analysis",
+                "icon": "🔍",
+                "description": "Analyzes student reviews to identify discovered and missed issues",
+                "selector_id": "review-model-cell"
+            },
+            "summary": {
+                "title": "Feedback Generation",
+                "icon": "📊",
+                "description": "Creates detailed feedback summaries after review completion",
+                "selector_id": "summary-model-cell"
+            },
+            "compare": {
+                "title": "Comparative Analysis",
+                "icon": "⚖️",
+                "description": "Compares student reviews with known issues for evaluation",
+                "selector_id": "compare-model-cell"
+            }
+        }
+        
+        # Create a card for each role
+        for role, config in role_configs.items():
+            st.markdown(f'<div class="model-role">', unsafe_allow_html=True)
+            
+            # Role header
+            st.markdown(f"""
+            <div class="role-header">
+                <div>
+                    <span class="role-title"><span class="role-icon">{config["icon"]}</span>{config["title"]}</span>
+                </div>
+            </div>
+            <div class="role-description">{config["description"]}</div>
+            """, unsafe_allow_html=True)
+            
+            # Add the model selector
+            st.markdown(f'<div id="{config["selector_id"]}">', unsafe_allow_html=True)
+            selected_model = st.selectbox(
+                f"Select model for {config['title']}",
+                options=model_options,
+                index=model_options.index(st.session_state.model_selections[role]) 
+                if st.session_state.model_selections[role] in model_options else 0,
+                key=f"{role}_model_select",
+                help=f"Choose which model to use for {config['title'].lower()}"
+            )
+            
+            # Update the selection in session state
+            st.session_state.model_selections[role] = selected_model
+            
+            # Show selected model with badge
+            model_size_badge = "Large" if "opus" in selected_model.lower() or "70b" in selected_model or "13b" in selected_model or "8b" in selected_model else "Medium" if "sonnet" in selected_model.lower() or "7b" in selected_model else "Small"
+            
+            st.markdown(f"""
+            <div class="selected-model">
+                <div>Selected: <strong>{selected_model}</strong></div>
+                <span class="model-badge">{model_size_badge}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # End container
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Add a "Save Configuration" button
+        if st.button("💾 Save Configuration", type="primary"):
+            # Update environment variables
+            for role, model in st.session_state.model_selections.items():
+                os.environ[f"{role.upper()}_MODEL"] = model
+            
+            st.success("Model configuration saved successfully!")
+        
+        return st.session_state.model_selections
