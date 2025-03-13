@@ -141,6 +141,36 @@
   opacity: 0.8;
 }
 
+/* GPU Badge styling */
+.badge-gpu {
+  background-color: rgba(118, 74, 188, 0.2);
+  color: #764abc !important;
+}
+
+/* GPU Status item in sidebar */
+.gpu-status-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  border-left: 3px solid #764abc;
+  padding-left: 10px;
+}
+
+.gpu-status-icon {
+  margin-right: 8px;
+  color: #764abc;
+}
+
+.gpu-status-text {
+  font-weight: 500;
+}
+
+.gpu-details {
+  font-size: 0.85em;
+  margin-top: 5px;
+  opacity: 0.8;
+}
+
 /* Enhanced model card with GPU highlights */
 .model-card.gpu-ready {
   border-left: 5px solid #764abc;
@@ -199,5 +229,75 @@
 .gpu-model-container {
   background: linear-gradient(90deg, rgba(118,74,188,0.05) 0%, rgba(118,74,188,0) 100%);
   padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* GPU progress visualization */
+.gpu-progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: rgba(118, 74, 188, 0.1);
+  border-radius: 4px;
+  margin-top: 5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.gpu-progress-fill {
+  height: 100%;
+  background-color: #764abc;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* GPU metrics display */
+.gpu-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.gpu-metric-card {
+  background-color: rgba(118, 74, 188, 0.05);
+  border-radius: 6px;
+  padding: 8px;
+  text-align: center;
+  border: 1px solid rgba(118, 74, 188, 0.1);
+}
+
+.gpu-metric-value {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #764abc;
+  margin: 5px 0;
+}
+
+.gpu-metric-label {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+/* Active model with GPU indicator */
+.active-model-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: rgba(118, 74, 188, 0.05);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-left: 3px solid #764abc;
+}
+
+.active-model-role {
+  font-weight: 500;
+  color: #764abc;
+}
+
+.active-model-name {
+  font-family: monospace;
+  background-color: rgba(118, 74, 188, 0.1);
+  padding: 2px 6px;
   border-radius: 4px;
 }

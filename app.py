@@ -283,12 +283,21 @@ def render_sidebar(llm_manager: LLMManager, workflow: JavaCodeReviewGraph):
                 # Show reinitializing message
                 st.info("Model selections changed. Reinitializing models...")
 
+
+
 def render_status_sidebar(llm_manager: LLMManager):
-    """Render the status sidebar tab with a more user-friendly interface"""
+    """Render the status sidebar tab with GPU information and model details."""
     st.header("System Status")
     
     # Check Ollama status
     status = check_ollama_status(llm_manager)
+    
+    # Get GPU information
+    gpu_info = llm_manager.refresh_gpu_info()
+    has_gpu = gpu_info.get("has_gpu", False)
+    
+    # Get active models
+    active_models = llm_manager.get_active_models()
     
     # Status indicators with better styling
     st.markdown("""
@@ -323,6 +332,60 @@ def render_status_sidebar(llm_manager: LLMManager):
             - Start Ollama with `ollama serve` in terminal
             - Windows users: Launch the Ollama application
             """)
+    
+    # GPU Status - New and more prominent
+    if has_gpu:
+        gpu_name = gpu_info.get("gpu_name", "GPU")
+        memory_total = gpu_info.get("formatted_total", "Unknown")
+        memory_used = gpu_info.get("formatted_used", "Unknown")
+        utilization = gpu_info.get("utilization", 0)
+        memory_percent = gpu_info.get("memory_used_percent", 0)
+        
+        # GPU Status icon and badge
+        st.markdown(
+            '<div class="status-item gpu-status-item">'
+            '<span class="gpu-status-icon">🚀</span>'
+            '<div class="gpu-status-text">GPU</div>'
+            '<span class="status-badge badge-gpu">Active</span>'
+            '</div>',
+            unsafe_allow_html=True
+        )
+        
+        # GPU details section
+        st.markdown(
+            '<div class="gpu-info-section">'
+            f'<div class="gpu-info-header">'
+            f'<span>📊</span>'
+            f'<div class="gpu-info-title">{gpu_name}</div>'
+            f'</div>'
+            f'<div class="gpu-info-detail">'
+            f'<span class="gpu-info-label">Memory</span>'
+            f'<span>{memory_used} / {memory_total}</span>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        
+        # Only show utilization if available
+        if utilization is not None:
+            st.markdown(
+                f'<div class="gpu-info-detail">'
+                f'<span class="gpu-info-label">Utilization</span>'
+                f'<span>{utilization:.1f}%</span>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+        
+        # Close GPU info section
+        st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(
+            '<div class="status-item">'
+            '<span>⚠️</span>'
+            '<div class="status-text">GPU</div>'
+            '<span class="status-badge badge-warning">Not Available</span>'
+            '</div>',
+            unsafe_allow_html=True
+        )
     
     # Default model status
     if status["default_model_available"]:
@@ -383,6 +446,38 @@ def render_status_sidebar(llm_manager: LLMManager):
     # Close the status container
     st.markdown('</div>', unsafe_allow_html=True)
     
+    # Active Models Section - New
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.subheader("Active Models")
+    
+    # Display current models in use with GPU status
+    for role, model_info in active_models.items():
+        model_name = model_info.get("name", "Unknown")
+        uses_gpu = model_info.get("uses_gpu", False) or model_info.get("gpu_optimized", False)
+        
+        # Role display name formatting
+        role_display = {
+            "generative": "Code Generation",
+            "review": "Review Analysis",
+            "summary": "Feedback",
+            "compare": "Comparison"
+        }.get(role, role.capitalize())
+        
+        # Model display with GPU badge if applicable
+        gpu_badge = '<span class="gpu-model-highlight">GPU</span>' if uses_gpu and has_gpu else ''
+        
+        st.markdown(
+            f'<div class="gpu-model-container">'
+            f'<div style="display: flex; justify-content: space-between; align-items: center;">'
+            f'<div><strong>{role_display}</strong></div>'
+            f'<div>{model_name} {gpu_badge}</div>'
+            f'</div>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
     # About section with better styling
     st.markdown(
         '<div class="about-box">'
@@ -397,6 +492,7 @@ def render_status_sidebar(llm_manager: LLMManager):
         '</div>',
         unsafe_allow_html=True
     )
+
 
 def render_settings_sidebar(workflow: JavaCodeReviewGraph):
     """Render the settings sidebar tab"""
@@ -469,10 +565,15 @@ def check_ollama_status(llm_manager: LLMManager) -> Dict[str, bool]:
     required_models = ["GENERATIVE_MODEL", "REVIEW_MODEL", "SUMMARY_MODEL", "COMPARE_MODEL"]
     all_models_configured = all(os.getenv(model) for model in required_models)
     
+    # Check GPU status
+    gpu_info = llm_manager.check_gpu_availability()
+    has_gpu = gpu_info.get("has_gpu", False)
+    
     return {
         "ollama_running": connection_status,
         "default_model_available": default_model_available,
-        "all_models_configured": all_models_configured
+        "all_models_configured": all_models_configured,
+        "gpu_available": has_gpu
     }
 
 def render_generate_tab(workflow, error_selector_ui, code_display_ui):

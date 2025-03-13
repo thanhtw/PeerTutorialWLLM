@@ -2,7 +2,7 @@
 LLM Manager module for Java Peer Review Training System.
 
 This module provides the LLMManager class for handling model initialization,
-configuration, and management of Ollama models.
+configuration, and management of Ollama models with enhanced GPU support.
 """
 
 import os
@@ -10,6 +10,8 @@ import requests
 import time
 import logging
 import json
+import psutil
+import subprocess
 from typing import Dict, Any, Optional, List, Union, Tuple
 from dotenv import load_dotenv
 from functools import lru_cache
@@ -33,7 +35,7 @@ logger = logging.getLogger(__name__)
 class LLMManager:
     """
     LLM Manager for handling model initialization, configuration and management.
-    Provides caching and error recovery for Ollama models.
+    Provides caching and error recovery for Ollama models with enhanced GPU support.
     """
     
     def __init__(self):
@@ -42,11 +44,26 @@ class LLMManager:
         self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         self.default_model = os.getenv("DEFAULT_MODEL", "llama3:1b")
         
+        # Force GPU usage by default if available
+        self.force_gpu = os.getenv("ENABLE_GPU", "true").lower() == "true"
+        self.gpu_layers = int(os.getenv("GPU_LAYERS", "-1"))  # -1 means use all available layers
+        
         # Track initialized models
         self.initialized_models = {}
         
         # Track model pull status
         self.pull_status = {}
+        
+        # Cache GPU info
+        self._gpu_info = None
+        
+        # Initialize GPU data
+        self.refresh_gpu_info()
+    
+    def refresh_gpu_info(self):
+        """Refresh GPU information with extended details."""
+        self._gpu_info = self.check_gpu_availability(extended=True)
+        return self._gpu_info
     
     def get_available_models(self) -> List[Dict[str, Any]]:
         """
@@ -57,14 +74,14 @@ class LLMManager:
         """
         # Standard models that can be pulled
         library_models = [
-            {"id": "llama3", "name": "Llama 3", "description": "Meta's Llama 3 model", "pulled": False},
-            {"id": "llama3:8b", "name": "Llama 3 (8B)", "description": "Meta's Llama 3 8B model", "pulled": False},
-            {"id": "llama3:1b", "name": "Llama 3 (1B)", "description": "Meta's Llama 3 1B model", "pulled": False},
-            {"id": "phi3:mini", "name": "Phi-3 Mini", "description": "Microsoft Phi-3 model", "pulled": False},
-            {"id": "gemma:2b", "name": "Gemma 2B", "description": "Google's lightweight Gemma model", "pulled": False},
-            {"id": "mistral", "name": "Mistral 7B", "description": "Mistral AI's 7B model", "pulled": False},
-            {"id": "codellama:7b", "name": "CodeLlama 7B", "description": "Meta's CodeLlama model for code generation", "pulled": False},
-            {"id": "deepseek-coder:6.7b", "name": "DeepSeek Coder 6.7B", "description": "DeepSeek Coder model for programming tasks", "pulled": False}
+            {"id": "llama3", "name": "Llama 3", "description": "Meta's Llama 3 model", "pulled": False, "gpu_optimized": True},
+            {"id": "llama3:8b", "name": "Llama 3 (8B)", "description": "Meta's Llama 3 8B model", "pulled": False, "gpu_optimized": True},
+            {"id": "llama3:1b", "name": "Llama 3 (1B)", "description": "Meta's Llama 3 1B model", "pulled": False, "gpu_optimized": True},
+            {"id": "phi3:mini", "name": "Phi-3 Mini", "description": "Microsoft Phi-3 model", "pulled": False, "gpu_optimized": True},
+            {"id": "gemma:2b", "name": "Gemma 2B", "description": "Google's lightweight Gemma model", "pulled": False, "gpu_optimized": True},
+            {"id": "mistral", "name": "Mistral 7B", "description": "Mistral AI's 7B model", "pulled": False, "gpu_optimized": True},
+            {"id": "codellama:7b", "name": "CodeLlama 7B", "description": "Meta's CodeLlama model for code generation", "pulled": False, "gpu_optimized": True},
+            {"id": "deepseek-coder:6.7b", "name": "DeepSeek Coder 6.7B", "description": "DeepSeek Coder model for programming tasks", "pulled": False, "gpu_optimized": True}
         ]
         
         # Check Ollama API for available models
@@ -79,16 +96,34 @@ class LLMManager:
                 for model in library_models:
                     if model["id"] in pulled_ids:
                         model["pulled"] = True
+                        
+                        # Check if model has GPU-specific parameters
+                        try:
+                            model_info = self.get_model_details(model["id"])
+                            modelfile = model_info.get("modelfile", "").lower()
+                            model["gpu_optimized"] = "gpu" in modelfile or model["gpu_optimized"]
+                        except:
+                            pass
                 
                 # Add any pulled models that aren't in our standard list
                 for pulled_model in pulled_models:
                     model_id = pulled_model["name"]
                     if not any(model["id"] == model_id for model in library_models):
+                        # Get model details to check GPU optimization
+                        gpu_optimized = False
+                        try:
+                            model_info = self.get_model_details(model_id)
+                            modelfile = model_info.get("modelfile", "").lower()
+                            gpu_optimized = "gpu" in modelfile or "cuda" in modelfile
+                        except:
+                            pass
+                            
                         library_models.append({
                             "id": model_id,
                             "name": model_id,
                             "description": f"Size: {pulled_model.get('size', 'Unknown')}",
-                            "pulled": True
+                            "pulled": True,
+                            "gpu_optimized": gpu_optimized
                         })
             
             return library_models
@@ -123,7 +158,8 @@ class LLMManager:
                     "template": model_info.get("template", "Unknown"),
                     "context_length": model_info.get("details", {}).get("context_length", "Unknown"),
                     "license": model_info.get("license", "Unknown"),
-                    "modelfile": model_info.get("modelfile", "")
+                    "modelfile": model_info.get("modelfile", ""),
+                    "gpu_optimized": "gpu" in model_info.get("modelfile", "").lower() or "cuda" in model_info.get("modelfile", "").lower()
                 }
                 
                 return details
@@ -301,9 +337,128 @@ class LLMManager:
         except Exception:
             return False
     
+    def get_gpu_memory_usage(self) -> Dict[str, Any]:
+        """
+        Get current GPU memory usage if available.
+        
+        Returns:
+            Dictionary with GPU memory usage information
+        """
+        try:
+            # Try to get GPU info using nvidia-smi if NVIDIA GPU
+            gpu_info = {}
+            
+            try:
+                # Try nvidia-smi for NVIDIA GPUs
+                result = subprocess.run(['nvidia-smi', '--query-gpu=memory.used,memory.total,utilization.gpu', '--format=csv,noheader,nounits'], 
+                                       capture_output=True, text=True, check=True)
+                
+                if result.returncode == 0:
+                    gpu_data = result.stdout.strip().split(',')
+                    if len(gpu_data) >= 3:
+                        mem_used = float(gpu_data[0].strip())
+                        mem_total = float(gpu_data[1].strip())
+                        gpu_util = float(gpu_data[2].strip())
+                        
+                        gpu_info = {
+                            "memory_used": mem_used,
+                            "memory_total": mem_total,
+                            "memory_used_percent": (mem_used / mem_total) * 100 if mem_total > 0 else 0,
+                            "utilization": gpu_util,
+                            "source": "nvidia-smi"
+                        }
+                        return gpu_info
+            except Exception as e:
+                logger.debug(f"Error getting NVIDIA GPU info: {str(e)}")
+            
+            # Try rocm-smi for AMD GPUs if nvidia-smi failed
+            try:
+                result = subprocess.run(['rocm-smi', '--showmeminfo', 'vram'], capture_output=True, text=True, check=True)
+                
+                if result.returncode == 0:
+                    # Parse rocm-smi output (more complex, may need adjustment)
+                    lines = result.stdout.strip().split('\n')
+                    if len(lines) > 1:
+                        mem_used = 0
+                        mem_total = 0
+                        
+                        for line in lines:
+                            if 'Used' in line:
+                                used_parts = line.split(':')
+                                if len(used_parts) > 1:
+                                    try:
+                                        mem_used = float(used_parts[1].strip().split()[0])
+                                    except:
+                                        pass
+                            if 'Total' in line:
+                                total_parts = line.split(':')
+                                if len(total_parts) > 1:
+                                    try:
+                                        mem_total = float(total_parts[1].strip().split()[0])
+                                    except:
+                                        pass
+                        
+                        gpu_info = {
+                            "memory_used": mem_used,
+                            "memory_total": mem_total,
+                            "memory_used_percent": (mem_used / mem_total) * 100 if mem_total > 0 else 0,
+                            "utilization": None,  # rocm-smi requires different commands for utilization
+                            "source": "rocm-smi"
+                        }
+                        return gpu_info
+            except Exception as e:
+                logger.debug(f"Error getting AMD GPU info: {str(e)}")
+            
+            # If we get here, we couldn't get GPU info
+            return {
+                "memory_used": 0,
+                "memory_total": 0,
+                "memory_used_percent": 0,
+                "utilization": 0,
+                "source": "none"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting GPU memory usage: {str(e)}")
+            return {
+                "memory_used": 0,
+                "memory_total": 0,
+                "memory_used_percent": 0,
+                "utilization": 0,
+                "error": str(e),
+                "source": "error"
+            }
+    
+    def get_system_memory_usage(self) -> Dict[str, Any]:
+        """
+        Get current system memory usage.
+        
+        Returns:
+            Dictionary with system memory usage information
+        """
+        try:
+            memory = psutil.virtual_memory()
+            return {
+                "total": memory.total,
+                "available": memory.available,
+                "used": memory.used,
+                "percent": memory.percent,
+                "formatted_total": self._format_size(memory.total),
+                "formatted_used": self._format_size(memory.used)
+            }
+        except Exception as e:
+            logger.error(f"Error getting system memory usage: {str(e)}")
+            return {
+                "total": 0,
+                "available": 0,
+                "used": 0,
+                "percent": 0,
+                "error": str(e)
+            }
+    
     def initialize_model(self, model_name: str, model_params: Dict[str, Any] = None) -> Optional[BaseLanguageModel]:
         """
-        Initialize an Ollama model with GPU support if available.
+        Initialize an Ollama model with enhanced GPU support.
         
         Args:
             model_name (str): Name of the model to initialize
@@ -323,8 +478,9 @@ class LLMManager:
         if model_params is None:
             model_params = self._get_default_params(model_name)
         
-        # Enable GPU acceleration if available
-        model_params = self.enable_gpu_for_model(model_params)
+        # Enable GPU acceleration if available and forced
+        if self.force_gpu:
+            model_params = self.enable_gpu_for_model(model_params)
         
         # Initialize Ollama model
         try:
@@ -348,6 +504,7 @@ class LLMManager:
                 logger.info(f"Removing max_tokens parameter to avoid Ollama validation error")
                 del additional_params["max_tokens"]
             
+            # Create the Ollama model
             llm = Ollama(
                 base_url=self.ollama_base_url,
                 model=model_name,
@@ -369,7 +526,14 @@ class LLMManager:
                     
                 # If successful, cache the model
                 self.initialized_models[model_name] = llm
-                logger.info(f"Successfully initialized model {model_name} with GPU support")
+                
+                # Log GPU info if available
+                gpu_info = self.check_gpu_availability()
+                if gpu_info.get("has_gpu", False):
+                    logger.info(f"Successfully initialized model {model_name} with GPU support")
+                else:
+                    logger.info(f"Successfully initialized model {model_name} (CPU only)")
+                    
                 return llm
             except Exception as e:
                 logger.error(f"Error testing model {model_name}: {str(e)}")
@@ -381,7 +545,7 @@ class LLMManager:
     
     def initialize_model_from_env(self, model_key: str, temperature_key: str) -> Optional[BaseLanguageModel]:
         """
-        Initialize a model using environment variables.
+        Initialize a model using environment variables with enhanced GPU support.
         
         Args:
             model_key (str): Environment variable key for model name
@@ -414,11 +578,24 @@ class LLMManager:
                     model_name = larger_model
                     logger.info(f"Reasoning mode: Upgraded to {model_name}")
         
+        # Enhanced GPU parameters
+        if self.force_gpu:
+            gpu_info = self.check_gpu_availability()
+            if gpu_info.get("has_gpu", False):
+                # Set GPU-specific parameters
+                model_params["n_gpu_layers"] = self.gpu_layers
+                
+                # Add additional GPU optimizations
+                model_params["f16_kv"] = True  # Use half-precision for key/value cache
+                model_params["logits_all"] = False  # Don't compute logits for all tokens (faster)
+                
+                logger.info(f"Enabling GPU acceleration for model {model_name}")
+        
         return self.initialize_model(model_name, model_params)
     
     def _get_default_params(self, model_name: str) -> Dict[str, Any]:
         """
-        Get default parameters for a specific model.
+        Get default parameters for a specific model with enhanced GPU support.
         
         Args:
             model_name (str): Name of the model
@@ -449,6 +626,15 @@ class LLMManager:
             
         elif "compare" in model_name:
             params["temperature"] = 0.5  # Balanced temperature for comparison tasks
+        
+        # Add enhanced GPU parameters if GPU is available and enabled
+        if self.force_gpu:
+            gpu_info = self.check_gpu_availability()
+            if gpu_info.get("has_gpu", False):
+                # Add GPU-specific parameters
+                params["n_gpu_layers"] = self.gpu_layers  # Use specified number of GPU layers
+                params["f16_kv"] = True  # Use half-precision for key/value cache (saves GPU memory)
+                params["logits_all"] = False  # Don't compute logits for all tokens (faster)
         
         return params
     
@@ -489,10 +675,13 @@ class LLMManager:
             logger.error(f"Error deleting model: {str(e)}")
             return False
         
-    def check_gpu_availability(self) -> Dict[str, Any]:
+    def check_gpu_availability(self, extended: bool = False) -> Dict[str, Any]:
         """
-        Check if GPU is available for Ollama.
+        Check if GPU is available for Ollama with enhanced details.
         
+        Args:
+            extended: Whether to include extended GPU info
+            
         Returns:
             Dict with GPU availability information
         """
@@ -510,19 +699,43 @@ class LLMManager:
                 # Format GPU information
                 if has_gpu:
                     gpu_name = gpu_info.get("name", "Unknown")
-                    gpu_memory = gpu_info.get("memory", {}).get("total", "Unknown")
+                    gpu_memory = gpu_info.get("memory", {})
+                    memory_total = gpu_memory.get("total", "Unknown")
+                    memory_used = gpu_memory.get("used", "Unknown")
                     
-                    return {
+                    result = {
                         "has_gpu": True,
                         "gpu_name": gpu_name,
-                        "gpu_memory": gpu_memory,
-                        "message": f"GPU detected: {gpu_name} with {gpu_memory} memory"
+                        "memory_total": memory_total,
+                        "memory_used": memory_used,
+                        "memory_free": memory_total - memory_used if isinstance(memory_total, (int, float)) and isinstance(memory_used, (int, float)) else "Unknown",
+                        "formatted_total": self._format_size(memory_total) if isinstance(memory_total, (int, float)) else "Unknown",
+                        "formatted_used": self._format_size(memory_used) if isinstance(memory_used, (int, float)) else "Unknown",
+                        "message": f"GPU detected: {gpu_name} with {self._format_size(memory_total) if isinstance(memory_total, (int, float)) else 'Unknown'} memory"
                     }
+                    
+                    # Add extended GPU info if requested
+                    if extended:
+                        # Try to get GPU utilization and temperature
+                        gpu_usage = self.get_gpu_memory_usage()
+                        result.update({
+                            "utilization": gpu_usage.get("utilization", 0),
+                            "memory_used_percent": gpu_usage.get("memory_used_percent", 0),
+                            "system_memory": self.get_system_memory_usage()
+                        })
+                    
+                    return result
                 else:
-                    return {
+                    result = {
                         "has_gpu": False,
                         "message": "No GPU detected for Ollama"
                     }
+                    
+                    # Add system memory info if extended
+                    if extended:
+                        result["system_memory"] = self.get_system_memory_usage()
+                    
+                    return result
             else:
                 return {
                     "has_gpu": False,
@@ -538,7 +751,7 @@ class LLMManager:
         
     def enable_gpu_for_model(self, model_params: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Enable GPU acceleration for model parameters.
+        Enable GPU acceleration for model parameters with enhanced settings.
         
         Args:
             model_params: Model parameters dictionary
@@ -553,16 +766,73 @@ class LLMManager:
             # Add GPU parameters to model configuration
             updated_params = model_params.copy()
             
-            # Set n_gpu_layers to -1 to use all available GPU layers
-            updated_params["n_gpu_layers"] = -1
+            # Set number of GPU layers
+            updated_params["n_gpu_layers"] = self.gpu_layers  # Use specified number of GPU layers
             
-            # You can also adjust other GPU-related parameters based on the specific model
-            # For example, for larger models with high memory requirements:
-            # updated_params["f16_kv"] = True  # Use half-precision for key/value cache
+            # Add other GPU optimizations
+            updated_params["f16_kv"] = True  # Use half-precision for key/value cache (saves GPU memory)
+            updated_params["logits_all"] = False  # Don't compute all logits (faster)
+            
+            # If we have GPU memory information, adjust parameters based on available memory
+            if "memory_total" in gpu_info and isinstance(gpu_info["memory_total"], (int, float)):
+                memory_gb = gpu_info["memory_total"] / (1024 * 1024 * 1024)
+                
+                if memory_gb < 4:
+                    # Very limited GPU memory - be more conservative
+                    updated_params["f16_kv"] = True
+                    updated_params["n_gpu_layers"] = min(24, self.gpu_layers if self.gpu_layers > 0 else 999)
+                elif memory_gb < 8:
+                    # Limited GPU memory
+                    updated_params["f16_kv"] = True
+                    updated_params["n_gpu_layers"] = min(32, self.gpu_layers if self.gpu_layers > 0 else 999)
             
             logger.info(f"Enabled GPU acceleration with {gpu_info['gpu_name']}")
             return updated_params
         else:
             logger.warning(f"GPU not available: {gpu_info['message']}")
             return model_params
-           
+    
+    def get_active_models(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Get information about all active models being used by the system.
+        
+        Returns:
+            Dictionary mapping roles to model information
+        """
+        active_models = {}
+        
+        # Get current model selections
+        roles = ["generative", "review", "summary", "compare"]
+        
+        for role in roles:
+            model_name = os.getenv(f"{role.upper()}_MODEL", self.default_model)
+            
+            # Get model details
+            model_info = {
+                "name": model_name,
+                "role": role,
+                "temperature": float(os.getenv(f"{role.upper()}_TEMPERATURE", "0.7")),
+                "uses_gpu": False,
+                "details": {}
+            }
+            
+            # Check if model is using GPU
+            if model_name in self.initialized_models:
+                # Model is initialized, check if it has GPU parameters
+                llm = self.initialized_models[model_name]
+                if hasattr(llm, "client"):
+                    client_params = getattr(llm.client, "_client_params", {})
+                    if client_params.get("n_gpu_layers", 0) != 0:
+                        model_info["uses_gpu"] = True
+            
+            # Try to get model details
+            try:
+                details = self.get_model_details(model_name)
+                model_info["details"] = details
+                model_info["gpu_optimized"] = details.get("gpu_optimized", False)
+            except:
+                pass
+            
+            active_models[role] = model_info
+        
+        return active_models
