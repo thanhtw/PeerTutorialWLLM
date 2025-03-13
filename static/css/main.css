@@ -1,0 +1,154 @@
+/* Global styles */
+.main .block-container {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    max-width: 1200px;
+}
+
+h1, h2, h3 {
+    margin-bottom: 0.5rem;
+}
+
+/* Code display */
+.stTextArea textarea {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+}
+
+.code-block {
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border: 1px solid #e9ecef;
+    padding: 15px;
+    font-family: 'Courier New', monospace;
+    white-space: pre-wrap;
+    margin: 10px 0;
+    font-size: 14px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+/* Content containers */
+.content-section {
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+/* Status indicators */
+.status-ok {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.status-warning {
+    color: #ffc107;
+    font-weight: bold;
+}
+
+.status-error {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+/* Feedback boxes */
+.guidance-box {
+    background-color: #e8f4f8;
+    border-left: 4px solid #0275d8;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+}
+
+.warning-box {
+    background-color: #fff3cd;
+    border-left: 4px solid #ffc107;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+}
+
+.feedback-box {
+    background-color: #d4edda;
+    border-left: 4px solid #28a745;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+}
+
+.review-box {
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border: 1px solid #e9ecef;
+    padding: 15px;
+    margin: 10px 0;
+}
+
+/* Badge styling */
+.iteration-badge {
+    display: inline-block;
+    background-color: #0275d8;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+/* Button spacing and sizing */
+.stButton button {
+    font-weight: 500;
+    padding: 0.375rem 0.75rem;
+}
+
+/* Forms and inputs */
+div[data-testid="stForm"] {
+    background-color: #f8f9fa;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #e9ecef;
+}
+
+div[data-testid="stVerticalBlock"] > div[data-testid="stCheckbox"] {
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.review-textarea textarea {
+    min-height: 300px;
+}
+
+/* Sidebar styling */
+.css-1d391kg {
+    background-color: #f8f9fa;
+}
+
+/* Add to main.css - Dark mode compatibility */
+[data-theme="dark"] .content-section,
+[data-theme="dark"] .model-card,
+[data-theme="dark"] .section-card {
+    background-color: #262730;
+    border-color: #555;
+}
+
+[data-theme="dark"] .tab-number {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .model-badge.badge-available {
+    background-color: rgba(76, 175, 80, 0.2);
+    color: #81c784;
+}
+
+[data-theme="dark"] .model-selection-table th {
+    background-color: #1e1e1e;
+    border-color: #444;
+}
+
+[data-theme="dark"] .model-selection-table td {
+    border-color: #444;
+}

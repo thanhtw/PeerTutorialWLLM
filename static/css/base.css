@@ -1,0 +1,65 @@
+/* Base styles that apply across the application */
+:root {
+    --primary: #4c68d7;
+    --primary-light: #6c8be5;
+    --primary-dark: #3b4fa3;
+    --success: #4CAF50;
+    --success-light: #81c784;
+    --warning: #ff9800;
+    --error: #f44336;
+    --background: #fff;
+    --card-bg: #fff;
+    --text: #333;
+    --text-secondary: #666;
+    --border: #e9ecef;
+    --shadow: rgba(0, 0, 0, 0.1);
+  }
+  
+  [data-theme="dark"] {
+    --primary: #4c68d7;
+    --primary-light: #6c8be5;
+    --primary-dark: #3b4fa3;
+    --success: #4CAF50;
+    --success-light: #81c784;
+    --warning: #ff9800;
+    --error: #f44336;
+    --background: #0e1117;
+    --card-bg: #262730;
+    --text: #fff;
+    --text-secondary: #ccc;
+    --border: #4d4d4d;
+    --shadow: rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Global styles */
+  .main .block-container {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    max-width: 1200px;
+  }
+  
+  h1, h2, h3 {
+    margin-bottom: 0.5rem;
+    color: var(--text);
+  }
+  
+  /* Content containers */
+  .content-section {
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 3px var(--shadow);
+  }
+  
+  /* Basic button override */
+  .stButton button {
+    font-weight: 500;
+  }
+  
+  /* Primary button styling */
+  button[data-testid="baseButton-primary"] {
+    background-color: var(--primary) !important;
+    color: white !important;
+  }

@@ -13,6 +13,10 @@ import time
 from typing import Dict, List, Any, Optional
 from dotenv import load_dotenv
 
+# Import CSS utilities
+from static.css_utils import load_css, inject_custom_css
+
+
 # Configure logging
 logging.getLogger('streamlit').setLevel(logging.ERROR)
 logging.basicConfig(
@@ -48,176 +52,31 @@ load_dotenv()
 # Set page config
 st.set_page_config(
     page_title="Java Code Review Trainer",
-    page_icon="",  # Java coffee cup icon
+    page_icon="",  # Java coffee cup icon
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Apply custom styling
-st.markdown("""
-    <style>
-        /* Global styles */
+# Load CSS from external files
+css_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "css")
+loaded_files = load_css(css_directory=css_dir)
+inject_custom_css()
+
+
+
+if not load_css(css_directory=css_dir):
+    # Fallback to inline CSS if loading fails
+    logger.warning("Failed to load CSS files, falling back to inline CSS")
+    st.markdown("""
+        <style>
+        /* Minimal fallback styling */
         .main .block-container {
             padding-top: 1rem;
             padding-bottom: 1rem;
             max-width: 1200px;
         }
-        
-        h1, h2, h3 {
-            margin-bottom: 0.5rem;
-        }
-        
-        /* Code display */
-        .stTextArea textarea {
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-        }
-        
-        .code-block {
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            border: 1px solid #e9ecef;
-            padding: 15px;
-            font-family: 'Courier New', monospace;
-            white-space: pre-wrap;
-            margin: 10px 0;
-            font-size: 14px;
-            max-height: 600px;
-            overflow-y: auto;
-        }
-        
-        /* Content containers */
-        .content-section {
-            background-color: #ffffff;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border: 1px solid #e9ecef;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-        
-        /* Status indicators */
-        .status-ok {
-            color: #28a745;
-            font-weight: bold;
-        }
-        
-        .status-warning {
-            color: #ffc107;
-            font-weight: bold;
-        }
-        
-        .status-error {
-            color: #dc3545;
-            font-weight: bold;
-        }
-        
-        /* Feedback boxes */
-        .guidance-box {
-            background-color: #e8f4f8;
-            border-left: 4px solid #0275d8;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 5px;
-        }
-        
-        .warning-box {
-            background-color: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 5px;
-        }
-        
-        .feedback-box {
-            background-color: #d4edda;
-            border-left: 4px solid #28a745;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 5px;
-        }
-        
-        .review-box {
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            border: 1px solid #e9ecef;
-            padding: 15px;
-            margin: 10px 0;
-        }
-        
-        /* Badge styling */
-        .iteration-badge {
-            display: inline-block;
-            background-color: #0275d8;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8em;
-            font-weight: bold;
-            margin-left: 10px;
-        }
-        
-        /* Button spacing and sizing */
-        .stButton button {
-            font-weight: 500;
-            padding: 0.375rem 0.75rem;
-        }
-        
-        /* Tab styling */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 8px;
-        }
-        
-        .stTabs [data-baseweb="tab"] {
-            height: 45px;
-            white-space: pre-wrap;
-            background-color: #f8f9fa;
-            border-radius: 4px 4px 0px 0px;
-            padding: 8px 16px;
-            font-weight: 500;
-        }
-        
-        .stTabs [aria-selected="true"] {
-            background-color: #0275d8;
-            color: white;
-        }
-        
-        /* Card styling for model display */
-        .card {
-            background-color: white;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            border: 1px solid #e9ecef;
-        }
-        
-        /* Make the form fields more compact */
-        div[data-testid="stForm"] {
-            background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #e9ecef;
-        }
-        
-        /* Make the checkboxes more compact */
-        div[data-testid="stVerticalBlock"] > div[data-testid="stCheckbox"] {
-            margin-bottom: 0;
-            padding-bottom: 0;
-        }
-        
-        /* Adjust the text area height */
-        .review-textarea textarea {
-            min-height: 300px;
-        }
-        
-        /* Streamlit sidebar styling */
-        .css-1d391kg {
-            background-color: #f8f9fa;
-        }
-            
-    </style>
-""", unsafe_allow_html=True)
+        </style>
+    """, unsafe_allow_html=True)
 
 def init_session_state():
     """Initialize session state variables."""
@@ -783,6 +642,30 @@ def render_review_tab(workflow, code_display_ui):
     
     st.markdown('</div>', unsafe_allow_html=True)
 
+def create_enhanced_tabs(tab_labels):
+    """
+    Create enhanced tabs with CSS-only styling.
+    No HTML in tab labels - just clean text.
+    
+    Args:
+        tab_labels: List of tab labels to display
+        
+    Returns:
+        List of streamlit tab objects
+    """
+    # Simply clean the labels - NO HTML
+    import re
+    clean_labels = []
+    for label in tab_labels:
+        # Remove any existing numbering like "1. " at the beginning
+        clean_label = re.sub(r'^\d+[\.\-\:]\s*', '', label)
+        clean_labels.append(clean_label)  
+    
+    # Create the tabs with clean labels (no HTML)
+    tabs = st.tabs(clean_labels)
+    
+    return tabs
+
 def render_feedback_tab(workflow, feedback_display_ui):
     """Render the feedback and analysis tab."""
     state = st.session_state.workflow_state
@@ -854,12 +737,15 @@ def main():
             st.session_state.error = None
             st.rerun()
     
-    # Create tabs for different steps of the workflow
-    tabs = st.tabs([
+    # Create enhanced tabs for different steps of the workflow
+    tab_labels = [
         "1. Generate Problem", 
         "2. Submit Review", 
         "3. View Feedback"
-    ])
+    ]
+    
+    # Use the enhanced tabs function
+    tabs = create_enhanced_tabs(tab_labels)
     
     # Set the active tab based on session state
     active_tab = st.session_state.active_tab

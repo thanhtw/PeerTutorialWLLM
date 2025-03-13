@@ -1,0 +1,88 @@
+/* Model management section styling */
+.section-card {
+    background-color: var(--card-bg);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 6px var(--shadow);
+    border: 1px solid var(--border);
+  }
+  
+  /* Model card styling */
+  .model-card {
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px var(--shadow);
+    border-left: 5px solid #ccc;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .model-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px var(--shadow);
+  }
+  
+  .model-available {
+    border-left-color: var(--success);
+    background-color: rgba(76, 175, 80, 0.1);
+  }
+  
+  .model-not-available {
+    border-left-color: #9e9e9e;
+  }
+  
+  .model-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  
+  .model-name {
+    font-weight: bold;
+    font-size: 1.1em;
+    color: var(--text);
+  }
+  
+  .model-id {
+    font-size: 0.9em;
+    opacity: 0.7;
+    margin-left: 5px;
+    color: var(--text-secondary);
+  }
+  
+  .model-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 500;
+  }
+  
+  .badge-available {
+    background-color: rgba(76, 175, 80, 0.2);
+    color: var(--success-light);
+  }
+  
+  .badge-not-available {
+    background-color: rgba(158, 158, 158, 0.2);
+    color: var(--text-secondary);
+  }
+  
+  .model-description {
+    margin: 6px 0;
+    font-size: 0.9em;
+    color: var(--text-secondary);
+  }
+  
+  /* Model selection */
+  .purpose-label {
+    font-weight: bold;
+    color: var(--text);
+  }
+  
+  .purpose-description {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+  }

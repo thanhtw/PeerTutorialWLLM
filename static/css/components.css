@@ -1,0 +1,86 @@
+/* Badge styling */
+.iteration-badge {
+    display: inline-block;
+    background-color: var(--primary);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: bold;
+    margin-left: 10px;
+  }
+  
+  /* Code display */
+  .stTextArea textarea {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    background-color: var(--card-bg);
+    color: var(--text);
+  }
+  
+  .code-block {
+    background-color: var(--card-bg);
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    padding: 15px;
+    font-family: 'Courier New', monospace;
+    white-space: pre-wrap;
+    margin: 10px 0;
+    font-size: 14px;
+    max-height: 600px;
+    overflow-y: auto;
+    color: var(--text);
+  }
+  
+  /* Feedback boxes */
+  .guidance-box {
+    background-color: rgba(2, 117, 216, 0.1);
+    border-left: 4px solid var(--primary);
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+    color: var(--text);
+  }
+  
+  .warning-box {
+    background-color: rgba(255, 193, 7, 0.1);
+    border-left: 4px solid var(--warning);
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+    color: var(--text);
+  }
+  
+  .feedback-box {
+    background-color: rgba(40, 167, 69, 0.1);
+    border-left: 4px solid var(--success);
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+    color: var(--text);
+  }
+  
+  .review-box {
+    background-color: var(--card-bg);
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    padding: 15px;
+    margin: 10px 0;
+    color: var(--text);
+  }
+  
+  /* Status indicators */
+  .status-ok {
+    color: var(--success);
+    font-weight: bold;
+  }
+  
+  .status-warning {
+    color: var(--warning);
+    font-weight: bold;
+  }
+  
+  .status-error {
+    color: var(--error);
+    font-weight: bold;
+  }

@@ -57,12 +57,16 @@ class ModelManagerUI:
     
     def render_model_manager(self) -> Dict[str, str]:
         """
-        Render the Ollama model management UI.
+        Render the Ollama model management UI with improved single column layout.
+        Uses external CSS files instead of inline styles.
         
         Returns:
             Dictionary with selected models for each role
         """
         st.header("Ollama Model Management")
+        
+        # No inline CSS needed here - the styles are loaded from the external CSS file
+        # using the css_utils.load_css() function at app startup
         
         # Check connection to Ollama
         connection_status, message = self.llm_manager.check_ollama_connection()
@@ -73,106 +77,117 @@ class ModelManagerUI:
             with st.expander("Troubleshooting"):
                 st.markdown("""
                 1. **Check if Ollama is running:**
-                   ```bash
-                   curl http://localhost:11434/api/tags
-                   ```
-                   
+                ```bash
+                curl http://localhost:11434/api/tags
+                ```
+                
                 2. **Make sure the Ollama service is started:**
-                   - On Linux/Mac: `ollama serve`
-                   - On Windows: Start the Ollama application
-                   
+                - On Linux/Mac: `ollama serve`
+                - On Windows: Start the Ollama application
+                
                 3. **Check the Ollama URL in .env file:**
-                   - Default is http://localhost:11434
+                - Default is http://localhost:11434
                 """)
             return st.session_state.model_selections
         
         # Get available models
         available_models = self.llm_manager.get_available_models()
         
-        # Display available models and allow pulling new ones
-        col1, col2 = st.columns([3, 2])
+        # Section 1: Available Models
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.subheader("Available Models")
         
-        with col1:
-            st.subheader("Available Models")
+        if not available_models:
+            st.info("No models found. Pull a model to get started.")
+        else:
+            # Create a filtered list of models to display
+             # Create a filtered list of models to display
+            display_models = []
+            for model in available_models:
+                display_models.append({
+                    "name": model["name"],
+                    "id": model["id"],
+                    "pulled": model["pulled"],
+                    "description": model["description"]
+                })
             
-            if not available_models:
-                st.info("No models found. Pull a model to get started.")
-            else:
-                # Create a filtered list of models to display
-                display_models = []
-                for model in available_models:
-                    display_models.append({
-                        "name": model["name"],
-                        "id": model["id"],
-                        "pulled": model["pulled"],
-                        "description": model["description"]
-                    })
+            # Generate model cards using CSS classes
+            for i, model in enumerate(display_models):
+                # Set card styling based on availability
+                card_class = "model-available" if model["pulled"] else "model-not-available"
+                badge_class = "badge-available" if model["pulled"] else "badge-not-available"
+                status_text = "Available" if model["pulled"] else "Not pulled"
                 
-                # Generate a table of available models
-                self._render_model_table(display_models)
+                st.markdown(f"""
+                    <div class="model-card {card_class}">
+                        <div class="model-header">
+                            <div>
+                                <span class="model-name">{model["name"]}</span>
+                                <span class="model-id">({model["id"]})</span>
+                            </div>
+                            <span class="model-badge {badge_class}">{status_text}</span>
+                        </div>
+                        <div class="model-description">
+                            {model["description"]}
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # Add pull button for models that aren't pulled
+                if not model["pulled"]:
+                    if st.button(f"Pull {model['id']}", key=f"pull_{model['id']}"):
+                        st.session_state.model_operations["pulling"] = True
+                        st.session_state.model_operations["current_pull"] = model["id"]
+                        st.session_state.model_operations["pull_progress"] = 0
+                        st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
         
-        with col2:
-            st.subheader("Pull New Model")
+        # Section 2: Pull New Model
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.subheader("Pull New Model")
+        
+        # When a model is being pulled, show progress
+        if st.session_state.model_operations["pulling"]:
+            model_name = st.session_state.model_operations["current_pull"]
+            st.info(f"Pulling model: {model_name}")
+            progress_bar = st.progress(st.session_state.model_operations["pull_progress"])
             
-            # When a model is being pulled, show progress
-            if st.session_state.model_operations["pulling"]:
-                model_name = st.session_state.model_operations["current_pull"]
-                st.info(f"Pulling model: {model_name}")
-                progress_bar = st.progress(st.session_state.model_operations["pull_progress"])
+            if st.button("Cancel"):
+                st.session_state.model_operations["pulling"] = False
+                st.session_state.model_operations["current_pull"] = None
+                st.session_state.model_operations["pull_progress"] = 0
+                st.rerun()
+        else:
+            # Model pull form
+            with st.form("pull_model_form"):
+                model_id = st.text_input(
+                    "Model ID", 
+                    placeholder="e.g., llama3:8b, phi3:mini, gemma:2b",
+                    help="Enter the ID of the model you want to pull from Ollama"
+                )
                 
-                if st.button("Cancel"):
-                    st.session_state.model_operations["pulling"] = False
-                    st.session_state.model_operations["current_pull"] = None
+                submitted = st.form_submit_button("Pull Model")
+                
+                if submitted and model_id:
+                    st.session_state.model_operations["pulling"] = True
+                    st.session_state.model_operations["current_pull"] = model_id
                     st.session_state.model_operations["pull_progress"] = 0
                     st.rerun()
-            else:
-                # Model pull form
-                with st.form("pull_model_form"):
-                    model_id = st.text_input(
-                        "Model ID", 
-                        placeholder="e.g., llama3:8b, phi3:mini, gemma:2b",
-                        help="Enter the ID of the model you want to pull from Ollama"
-                    )
-                    
-                    submitted = st.form_submit_button("Pull Model")
-                    
-                    if submitted and model_id:
-                        st.session_state.model_operations["pulling"] = True
-                        st.session_state.model_operations["current_pull"] = model_id
-                        st.session_state.model_operations["pull_progress"] = 0
-                        
-                        # Start a background job to pull the model
-                        def pull_model():
-                            try:
-                                success = self.llm_manager.download_ollama_model(model_id)
-                                
-                                if success:
-                                    st.session_state.model_operations["last_pulled"] = model_id
-                                else:
-                                    st.session_state.model_operations["error"] = f"Failed to pull model: {model_id}"
-                            except Exception as e:
-                                st.session_state.model_operations["error"] = f"Error: {str(e)}"
-                            finally:
-                                st.session_state.model_operations["pulling"] = False
-                                st.session_state.model_operations["current_pull"] = None
-                                st.session_state.model_operations["pull_progress"] = 0
-                        
-                        # We can't actually run a background job in Streamlit, so we'll fake it with progress
-                        # In a real app, you'd want to use something like BackgroundProcess from streamlit-extras
-                        st.rerun()
-            
-            # Show last pulled model
-            if st.session_state.model_operations["last_pulled"]:
-                st.success(f"Successfully pulled model: {st.session_state.model_operations['last_pulled']}")
-            
-            # Show error if any
-            if st.session_state.model_operations["error"]:
-                st.error(st.session_state.model_operations["error"])
-                if st.button("Clear Error"):
-                    st.session_state.model_operations["error"] = None
-                    st.rerun()
         
-        # Model selection for different roles
+        # Show last pulled model
+        if st.session_state.model_operations["last_pulled"]:
+            st.success(f"Successfully pulled model: {st.session_state.model_operations['last_pulled']}")
+        
+        # Show error if any
+        if st.session_state.model_operations["error"]:
+            st.error(st.session_state.model_operations["error"])
+            if st.button("Clear Error"):
+                st.session_state.model_operations["error"] = None
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Section 3: Model Selection
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.subheader("Model Selection")
         
         # Get model options (only pulled models)
@@ -181,60 +196,88 @@ class ModelManagerUI:
         if not model_options:
             st.warning("No models are available. Please pull at least one model.")
         else:
-            # Create columns for model selection
-            col1, col2 = st.columns(2)
+            # Create a table-style layout for model selection
+            st.markdown("""
+                <table class="model-selection-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 30%;">Purpose</th>
+                            <th>Selected Model</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Code Generation</strong><br><span class="purpose-description">For creating Java code problems</span></td>
+                            <td id="generative-model-cell"></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Review Analysis</strong><br><span class="purpose-description">For analyzing student reviews</span></td>
+                            <td id="review-model-cell"></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Summary Generation</strong><br><span class="purpose-description">For generating feedback summaries</span></td>
+                            <td id="summary-model-cell"></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Comparison</strong><br><span class="purpose-description">For comparing student reviews with actual issues</span></td>
+                            <td id="compare-model-cell"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            """, unsafe_allow_html=True)
+            
+            # Add model selection dropdowns to table cells
+            col1, col2, col3, col4 = st.columns(4)
             
             with col1:
-                # For code generation
-                st.markdown("**Code Generation Model**")
+                st.markdown('<div id="generative-model-cell">', unsafe_allow_html=True)
                 generative_model = st.selectbox(
                     "Model for generating code problems",
                     options=model_options,
                     index=model_options.index(st.session_state.model_selections["generative"]) 
                     if st.session_state.model_selections["generative"] in model_options else 0,
-                    key="generative_model_select"
+                    key="generative_model_select",
+                    label_visibility="collapsed"
                 )
-                
                 st.session_state.model_selections["generative"] = generative_model
-                
-                # For review analysis
-                st.markdown("**Review Analysis Model**")
+            
+            with col2:
+                st.markdown('<div id="review-model-cell">', unsafe_allow_html=True)
                 review_model = st.selectbox(
                     "Model for analyzing student reviews",
                     options=model_options,
                     index=model_options.index(st.session_state.model_selections["review"]) 
                     if st.session_state.model_selections["review"] in model_options else 0,
-                    key="review_model_select"
+                    key="review_model_select",
+                    label_visibility="collapsed"
                 )
-                
                 st.session_state.model_selections["review"] = review_model
             
-            with col2:
-                # For summary generation
-                st.markdown("**Summary Generation Model**")
+            with col3:
+                st.markdown('<div id="summary-model-cell">', unsafe_allow_html=True)
                 summary_model = st.selectbox(
                     "Model for generating feedback summaries",
                     options=model_options,
                     index=model_options.index(st.session_state.model_selections["summary"]) 
                     if st.session_state.model_selections["summary"] in model_options else 0,
-                    key="summary_model_select"
+                    key="summary_model_select",
+                    label_visibility="collapsed"
                 )
-                
                 st.session_state.model_selections["summary"] = summary_model
-                
-                # For comparison
-                st.markdown("**Comparison Model**")
+            
+            with col4:
+                st.markdown('<div id="compare-model-cell">', unsafe_allow_html=True)
                 compare_model = st.selectbox(
                     "Model for comparing student reviews with actual issues",
                     options=model_options,
                     index=model_options.index(st.session_state.model_selections["compare"]) 
                     if st.session_state.model_selections["compare"] in model_options else 0,
-                    key="compare_model_select"
+                    key="compare_model_select",
+                    label_visibility="collapsed"
                 )
-                
                 st.session_state.model_selections["compare"] = compare_model
             
-            # Advanced settings
+            # Advanced settings expander
             with st.expander("Advanced Settings", expanded=False):
                 # Enable/disable reasoning mode
                 reasoning_mode = st.checkbox(
@@ -294,7 +337,7 @@ class ModelManagerUI:
                 )
                 
                 # Save settings button
-                if st.button("Save Settings to .env"):
+                if st.button("Save Settings to .env", type="primary"):
                     # Update environment variables in memory
                     os.environ["GENERATIVE_MODEL"] = st.session_state.model_selections["generative"]
                     os.environ["REVIEW_MODEL"] = st.session_state.model_selections["review"]
@@ -309,7 +352,7 @@ class ModelManagerUI:
                     os.environ["REASONING_MODE"] = str(reasoning_mode).lower()
                     os.environ["REASONING_TEMPERATURE"] = str(reasoning_temp)
                     
-                    # Update .env file (this is a simple implementation; a real app would use a more robust approach)
+                    # Update .env file
                     try:
                         env_path = ".env"
                         if os.path.exists(env_path):
@@ -376,6 +419,8 @@ class ModelManagerUI:
                             st.success("Created new .env file with settings!")
                     except Exception as e:
                         st.error(f"Error saving settings: {str(e)}")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
         
         # Return the current model selections
         return st.session_state.model_selections
