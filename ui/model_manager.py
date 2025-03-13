@@ -55,6 +55,50 @@ class ModelManagerUI:
                 "error": None
             }
     
+    def render_model_card(self, model, gpu_available=False):
+        """
+        Render a professional model card with GPU status.
+        
+        Args:
+            model: Model information dictionary
+            gpu_available: Whether GPU acceleration is available
+        """
+        # Set card styling based on availability
+        card_class = "model-available" if model["pulled"] else "model-not-available"
+        badge_class = "badge-available" if model["pulled"] else "badge-not-available"
+        status_text = "Available" if model["pulled"] else "Not pulled"
+        
+        # Add GPU badge if available and model is pulled
+        gpu_badge = ""
+        if gpu_available and model["pulled"]:
+            gpu_badge = '<span class="model-badge badge-gpu">GPU Ready</span>'
+        
+        st.markdown(f"""
+            <div class="model-card {card_class}">
+                <div class="model-header">
+                    <div>
+                        <span class="model-name">{model["name"]}</span>
+                        <span class="model-id">({model["id"]})</span>
+                    </div>
+                    <div>
+                        <span class="model-badge {badge_class}">{status_text}</span>
+                        {gpu_badge}
+                    </div>
+                </div>
+                <div class="model-description">
+                    {model["description"]}
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # Add pull button for models that aren't pulled
+        if not model["pulled"]:
+            if st.button(f"Pull {model['id']}", key=f"pull_{model['id']}"):
+                st.session_state.model_operations["pulling"] = True
+                st.session_state.model_operations["current_pull"] = model["id"]
+                st.session_state.model_operations["pull_progress"] = 0
+                st.rerun()
+
     def render_model_manager(self) -> Dict[str, str]:
         """
         Render the Ollama model management UI with improved single column layout
@@ -90,6 +134,35 @@ class ModelManagerUI:
         
         # Get available models
         available_models = self.llm_manager.get_available_models()
+
+        # Check GPU availability
+        gpu_info = self.llm_manager.check_gpu_availability()
+        gpu_available = gpu_info.get("has_gpu", False)
+
+        # Display GPU status at the top
+        if gpu_available:
+            st.success(f"🚀 GPU Acceleration Enabled: {gpu_info.get('gpu_name', 'GPU')}")
+        else:
+            st.warning("⚠️ GPU Acceleration Not Available - Model inference will use CPU only")
+            with st.expander("GPU Setup Help"):
+                st.markdown("""
+                ### Setting up GPU Acceleration for Ollama
+                
+                1. **Requirements**:
+                - NVIDIA GPU with CUDA support (GTX series, RTX series, etc.)
+                - Or AMD GPU with ROCm support
+                
+                2. **Install Drivers**:
+                - For NVIDIA: Install CUDA drivers from NVIDIA website
+                - For AMD: Install ROCm drivers
+                
+                3. **Configure Ollama**:
+                - Ensure Ollama is set up to use your GPU
+                - See [Ollama GPU Documentation](https://github.com/ollama/ollama/blob/main/docs/gpu.md)
+                
+                4. **Restart Ollama**:
+                - After configuration, restart the Ollama service
+                """)
         
         # Section 1: Available Models
         st.markdown('<div class="section-card">', unsafe_allow_html=True)

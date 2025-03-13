@@ -303,7 +303,7 @@ class LLMManager:
     
     def initialize_model(self, model_name: str, model_params: Dict[str, Any] = None) -> Optional[BaseLanguageModel]:
         """
-        Initialize an Ollama model.
+        Initialize an Ollama model with GPU support if available.
         
         Args:
             model_name (str): Name of the model to initialize
@@ -322,6 +322,9 @@ class LLMManager:
         # Apply default model parameters if none provided
         if model_params is None:
             model_params = self._get_default_params(model_name)
+        
+        # Enable GPU acceleration if available
+        model_params = self.enable_gpu_for_model(model_params)
         
         # Initialize Ollama model
         try:
@@ -366,7 +369,7 @@ class LLMManager:
                     
                 # If successful, cache the model
                 self.initialized_models[model_name] = llm
-                logger.info(f"Successfully initialized model {model_name}")
+                logger.info(f"Successfully initialized model {model_name} with GPU support")
                 return llm
             except Exception as e:
                 logger.error(f"Error testing model {model_name}: {str(e)}")
@@ -485,3 +488,81 @@ class LLMManager:
         except Exception as e:
             logger.error(f"Error deleting model: {str(e)}")
             return False
+        
+    def check_gpu_availability(self) -> Dict[str, Any]:
+        """
+        Check if GPU is available for Ollama.
+        
+        Returns:
+            Dict with GPU availability information
+        """
+        try:
+            # Check Ollama API for hardware information
+            response = requests.get(f"{self.ollama_base_url}/api/hardware", timeout=5)
+            
+            if response.status_code == 200:
+                hardware_info = response.json()
+                gpu_info = hardware_info.get("gpu", {})
+                
+                # Check if GPU is available
+                has_gpu = bool(gpu_info)
+                
+                # Format GPU information
+                if has_gpu:
+                    gpu_name = gpu_info.get("name", "Unknown")
+                    gpu_memory = gpu_info.get("memory", {}).get("total", "Unknown")
+                    
+                    return {
+                        "has_gpu": True,
+                        "gpu_name": gpu_name,
+                        "gpu_memory": gpu_memory,
+                        "message": f"GPU detected: {gpu_name} with {gpu_memory} memory"
+                    }
+                else:
+                    return {
+                        "has_gpu": False,
+                        "message": "No GPU detected for Ollama"
+                    }
+            else:
+                return {
+                    "has_gpu": False,
+                    "message": f"Failed to get hardware info: {response.status_code}"
+                }
+                
+        except Exception as e:
+            logger.error(f"Error checking GPU availability: {str(e)}")
+            return {
+                "has_gpu": False,
+                "message": f"Error checking GPU: {str(e)}"
+            }
+        
+    def enable_gpu_for_model(self, model_params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Enable GPU acceleration for model parameters.
+        
+        Args:
+            model_params: Model parameters dictionary
+            
+        Returns:
+            Updated model parameters with GPU acceleration
+        """
+        # Check GPU availability first
+        gpu_info = self.check_gpu_availability()
+        
+        if gpu_info["has_gpu"]:
+            # Add GPU parameters to model configuration
+            updated_params = model_params.copy()
+            
+            # Set n_gpu_layers to -1 to use all available GPU layers
+            updated_params["n_gpu_layers"] = -1
+            
+            # You can also adjust other GPU-related parameters based on the specific model
+            # For example, for larger models with high memory requirements:
+            # updated_params["f16_kv"] = True  # Use half-precision for key/value cache
+            
+            logger.info(f"Enabled GPU acceleration with {gpu_info['gpu_name']}")
+            return updated_params
+        else:
+            logger.warning(f"GPU not available: {gpu_info['message']}")
+            return model_params
+           
