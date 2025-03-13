@@ -102,6 +102,7 @@
 /* For the active tab */
 .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] [data-testid="stMarkdownContainer"] p {
   color: white !important;
+  background-color: #a8a8bd;
 }
 
 .st-emotion-cache-atejua{
@@ -115,5 +116,18 @@
   color: white !important;
 }
 p{
+  color: white !important;
+}
+
+.param-title{
+  color: white !important;
+}
+.stElementContainer{
+  color: white !important;
+}
+.role-description{
+  color: white !important;
+}
+h3{
   color: white !important;
 }
