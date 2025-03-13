@@ -6,6 +6,7 @@ through the web interface.
 """
 
 import streamlit as st
+import re
 import logging
 import os
 import time
@@ -78,21 +79,25 @@ class ModelManagerUI:
             gpu_badge = '<span class="model-badge badge-gpu">GPU Ready</span>'
             gpu_class = "gpu-ready"
         
+        # Extract and clean model information
+        model_name = model["name"]
+        model_id = model["id"]
+        
+        # Clean the description - strip HTML tags entirely
+        import re
+        model_description = re.sub(r'<[^>]*>', '', model["description"])
+        
+        # Render the card
         st.markdown(f"""
             <div class="model-card {card_class} {gpu_class}">
                 <div class="model-header">
                     <div>
-                        <span class="model-name">{model["name"]}</span>
-                        <span class="model-id">({model["id"]})</span>
+                        <span class="model-name">{model_name}</span>
+                        <span class="model-id">({model_id})</span>
                     </div>
                     <div>
                         <span class="model-badge {badge_class}">{status_text}</span>
                         {gpu_badge}
-                    </div>
-                </div>
-                <div class="model-description">
-                    {model["description"]}
-                </div>
             </div>
         """, unsafe_allow_html=True)
         
