@@ -132,7 +132,7 @@ def inject_custom_css():
     }
     
     .model-id, .model-description, .role-description {
-      color: var(--text-secondary);
+      color: white;
     }
     
     /* Fix for buttons */

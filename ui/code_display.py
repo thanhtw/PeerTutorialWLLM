@@ -46,14 +46,14 @@ class CodeDisplayUI:
         download_key = f"download_code_{hash(code_snippet)%10000}"
         
         # Download button for the code
-        if st.download_button(
-            label="Download Code", 
-            data=code_snippet,
-            file_name="java_review_problem.java",
-            mime="text/plain",
-            key=download_key
-        ):
-            st.success("Code downloaded successfully!")
+        # if st.download_button(
+        #     label="Download Code", 
+        #     data=code_snippet,
+        #     file_name="java_review_problem.java",
+        #     mime="text/plain",
+        #     key=download_key
+        # ):
+        #     st.success("Code downloaded successfully!")
         
         # INSTRUCTOR VIEW: Show known problems if provided
         if known_problems:

@@ -154,9 +154,7 @@
 .param-container {
   background-color: var(--card-bg);
   border-radius: 8px;
-  border: 1px solid var(--border);
-  padding: 16px;
-  margin-bottom: 20px;
+  border: 1px solid var(--border);  
 }
 .param-title {
   font-weight: 600;

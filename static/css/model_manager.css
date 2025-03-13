@@ -62,7 +62,7 @@
   }
   
   .badge-available {
-    background-color:#28a745;
+    background-color:#28a745 !important;
     color: var(--success-light);
   }
   
@@ -167,7 +167,7 @@
 }
 
 .model-id {
-  color: var(--text-secondary);
+  color: white;
 }
 
 .model-description {

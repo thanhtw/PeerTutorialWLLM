@@ -126,9 +126,9 @@ class FeedbackDisplayUI:
                         st.markdown(review_summary)
         
         # Download button for feedback report
-        if review_summary:
+        #if review_summary:
             # Create a dynamic key based on the content
-            feedback_key = f"download_feedback_{hash(review_summary)%10000}"
+            #feedback_key = f"download_feedback_{hash(review_summary)%10000}"
             
             # if st.download_button(
             #     label="Download Feedback Report", 

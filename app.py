@@ -477,7 +477,7 @@ def check_ollama_status(llm_manager: LLMManager) -> Dict[str, bool]:
 
 def render_generate_tab(workflow, error_selector_ui, code_display_ui):
     """Render the code generation tab."""
-    st.markdown("#### Generate a Java Code Problem")
+    #st.markdown("#### Generate a Java Code Problem")
     
     # Create a content card for the form
     #st.markdown('<div class="content-section">', unsafe_allow_html=True)
