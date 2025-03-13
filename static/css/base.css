@@ -90,3 +90,12 @@
   padding: 15px;
   margin-top: 20px;
 }
+
+.white-text {
+  color: white;
+}
+
+/* You can also target specific Streamlit elements */
+.stMarkdown p {
+  color: white;
+}
