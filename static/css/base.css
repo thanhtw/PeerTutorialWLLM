@@ -99,3 +99,13 @@
 .stMarkdown p {
   color: white;
 }
+
+/* Style for radio buttons text */
+.stRadio label {
+  color: white !important;
+}
+
+/* Style for the radio button title/label */
+.stRadio div[data-testid="stRadioLabel"] {
+  color: white !important;
+}

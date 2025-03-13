@@ -88,9 +88,25 @@
 }
 
 [data-theme="dark"] .stTabs [data-baseweb="tab-list"] {
-  background-color: #1e1e24;
+  background-color: #a8a8bd;
 }
 
 [data-theme="dark"] .stTabs [data-baseweb="tab-panel"] {
   background-color: #262730;
+}
+
+.stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+  color: white !important;
+}
+
+/* For the active tab */
+.stTabs [data-baseweb="tab-list"] button[aria-selected="true"] [data-testid="stMarkdownContainer"] p {
+  color: white !important;
+}
+
+.st-emotion-cache-atejua{
+  color: white !important;
+}
+.stAlert{
+  color: white !important;
 }

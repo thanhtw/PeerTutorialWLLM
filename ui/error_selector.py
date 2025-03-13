@@ -300,7 +300,7 @@ class ErrorSelectorUI:
         Returns:
             Selected mode ("standard", "advanced", or "specific")
         """
-        st.markdown("### Error Selection Mode")
+        st.markdown("#### Error Selection Mode")
         
         # Create a more descriptive selection with radio buttons
         mode_options = [
@@ -362,7 +362,7 @@ class ErrorSelectorUI:
         if "problem_areas" not in st.session_state:
             st.session_state.problem_areas = ["Style", "Logical", "Performance"]
         
-        st.markdown("### Focus Areas for Code Review")
+        st.markdown("#### Focus Areas for Code Review")
         st.markdown("Select the categories of issues you want to find in the generated code:")
         
         # Create a more professional card-based selection
