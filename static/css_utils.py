@@ -52,9 +52,24 @@ def load_css(css_file=None, css_directory=None):
     return []
 
 def inject_custom_css():
-    """Force injection of critical CSS directly."""
+    """Force injection of critical CSS directly including text color fixes."""
     st.markdown("""
     <style>
+    /* Color variables for proper text visibility */
+    :root {
+      --text: #333333;
+      --text-secondary: #666666;
+      --text-on-primary: #ffffff;
+      --text-on-dark: #ffffff;
+    }
+    
+    [data-theme="dark"] {
+      --text: #ffffff;
+      --text-secondary: #cccccc;
+      --text-on-primary: #ffffff;
+      --text-on-dark: #ffffff;
+    }
+    
     /* Critical styling for dark mode compatibility */
     .stTabs [data-baseweb="tab-list"] {
       gap: 10px;
@@ -69,16 +84,19 @@ def inject_custom_css():
       border-radius: 8px 8px 0 0;
       padding: 8px 16px;
       font-weight: 500;
+      color: var(--text-secondary);
     }
     
     .stTabs [aria-selected="true"] {
       background-color: #4c68d7;
-      color: white;
+      color: var(--text-on-primary);
     }
     
+    /* Tab label components */
     .tab-label {
       display: flex;
       align-items: center;
+      color: var(--text);
     }
     
     .tab-number {
@@ -91,14 +109,17 @@ def inject_custom_css():
       border-radius: 50%;
       margin-right: 8px;
       font-weight: bold;
+      color: var(--text-on-dark);
     }
     
+    /* Model card styling */
     .model-card {
-      background-color: #1e1e1e;
+      background-color: var(--card-bg);
       border-left: 5px solid #ccc;
       padding: 12px;
       margin-bottom: 12px;
       border-radius: 4px;
+      color: var(--text);
     }
     
     .model-available {
@@ -106,9 +127,46 @@ def inject_custom_css():
       background-color: rgba(76, 175, 80, 0.1);
     }
     
+    .model-name, .model-title, .role-title {
+      color: var(--text);
+    }
+    
+    .model-id, .model-description, .role-description {
+      color: var(--text-secondary);
+    }
+    
+    /* Fix for buttons */
     button[data-testid="baseButton-primary"] {
       background-color: #4c68d7 !important;
       color: white !important;
+    }
+    
+    /* Fix text in model selection roles */
+    .model-role {
+      color: var(--text);
+    }
+    
+    .selected-model {
+      color: var(--text);
+    }
+    
+    /* Fix text in problem areas */
+    .problem-area-card {
+      color: var(--text);
+    }
+    
+    .problem-area-description {
+      color: var(--text-secondary);
+    }
+    
+    /* Fix guidance boxes */
+    .guidance-box, .warning-box, .feedback-box, .review-box {
+      color: var(--text);
+    }
+    
+    /* Fix text in review history */
+    .review-history-box pre {
+      color: var(--text);
     }
     </style>
     """, unsafe_allow_html=True)

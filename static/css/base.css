@@ -1,36 +1,17 @@
 /* Base styles that apply across the application */
 :root {
-    --primary: #4c68d7;
-    --primary-light: #6c8be5;
-    --primary-dark: #3b4fa3;
-    --success: #4CAF50;
-    --success-light: #81c784;
-    --warning: #ff9800;
-    --error: #f44336;
-    --background: #fff;
-    --card-bg: #fff;
-    --text: #333;
-    --text-secondary: #666;
-    --border: #e9ecef;
-    --shadow: rgba(0, 0, 0, 0.1);
-  }
-  
-  [data-theme="dark"] {
-    --primary: #4c68d7;
-    --primary-light: #6c8be5;
-    --primary-dark: #3b4fa3;
-    --success: #4CAF50;
-    --success-light: #81c784;
-    --warning: #ff9800;
-    --error: #f44336;
-    --background: #0e1117;
-    --card-bg: #262730;
-    --text: #fff;
-    --text-secondary: #ccc;
-    --border: #4d4d4d;
-    --shadow: rgba(0, 0, 0, 0.3);
-  }
-  
+  --text: #333333;
+  --text-secondary: #666666;
+  --text-on-primary: #ffffff;
+  --text-on-dark: #ffffff;
+}
+
+[data-theme="dark"] {
+  --text: #ffffff;
+  --text-secondary: #cccccc;
+  --text-on-primary: #ffffff;
+  --text-on-dark: #ffffff;
+}
   /* Global styles */
   .main .block-container {
     padding-top: 1rem;

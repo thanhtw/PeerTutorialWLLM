@@ -57,16 +57,55 @@ class ModelManagerUI:
     
     def render_model_manager(self) -> Dict[str, str]:
         """
-        Render the Ollama model management UI with improved single column layout.
-        Uses external CSS files instead of inline styles.
+        Render the Ollama model management UI with improved single column layout
+        and fixed text colors for better visibility.
         
         Returns:
             Dictionary with selected models for each role
         """
         st.header("Ollama Model Management")
         
-        # No inline CSS needed here - the styles are loaded from the external CSS file
-        # using the css_utils.load_css() function at app startup
+        # Add essential text color fixes
+        st.markdown("""
+        <style>
+        /* Ensure text is visible in both light and dark modes */
+        .model-card {
+            color: var(--text);
+        }
+        
+        .model-name {
+            color: var(--text);
+        }
+        
+        .model-id {
+            color: var(--text-secondary);
+        }
+        
+        .model-description {
+            color: var(--text-secondary);
+        }
+        
+        .model-badge {
+            color: var(--text-on-primary);
+        }
+        
+        .badge-available {
+            color: var(--success) !important;
+        }
+        
+        .badge-not-available {
+            color: var(--text-secondary) !important;
+        }
+        
+        h3, h4, p {
+            color: var(--text);
+        }
+        
+        .section-card {
+            color: var(--text);
+        }
+        </style>
+        """, unsafe_allow_html=True)
         
         # Check connection to Ollama
         connection_status, message = self.llm_manager.check_ollama_connection()
@@ -195,9 +234,9 @@ class ModelManagerUI:
         if not model_options:
             st.warning("No models are available. Please pull at least one model.")
         else:
-            # Use the new improved model selection table
+            # Use the improved model selection table with fixed text colors
             model_selections = self.render_model_selection_table(model_options)
-            
+        
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Return the current model selections
@@ -258,7 +297,7 @@ class ModelManagerUI:
 
     def render_model_selection_table(self, model_options):
         """
-        Render a professionally styled model selection table
+        Render a professionally styled model selection table with fixed text colors
         
         Args:
             model_options: List of available model options
@@ -266,7 +305,7 @@ class ModelManagerUI:
         Returns:
             Dictionary with selected models for each role
         """
-        # Custom CSS for professional table styling
+        # Custom CSS for professional table styling with proper text colors
         st.markdown("""
         <style>
         .model-selection-container {
@@ -326,6 +365,7 @@ class ModelManagerUI:
             display: flex;
             justify-content: space-between;
             align-items: center;
+            color: var(--text);
         }
         
         .model-badge {
@@ -339,8 +379,8 @@ class ModelManagerUI:
         </style>
         """, unsafe_allow_html=True)
         
-        st.markdown("<h3>Model Configuration</h3>", unsafe_allow_html=True)
-        st.markdown("<p>Select which model to use for each stage of the code review process:</p>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: var(--text);'>Model Configuration</h3>", unsafe_allow_html=True)
+        st.markdown("<p style='color: var(--text-secondary);'>Select which model to use for each stage of the code review process:</p>", unsafe_allow_html=True)
         
         # Start container for model roles
         st.markdown('<div class="model-selection-container">', unsafe_allow_html=True)
@@ -406,7 +446,7 @@ class ModelManagerUI:
             
             st.markdown(f"""
             <div class="selected-model">
-                <div>Selected: <strong>{selected_model}</strong></div>
+                <div>Selected: <strong style="color: var(--text);">{selected_model}</strong></div>
                 <span class="model-badge">{model_size_badge}</span>
             </div>
             """, unsafe_allow_html=True)
