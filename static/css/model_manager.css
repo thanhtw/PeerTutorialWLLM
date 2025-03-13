@@ -86,3 +86,209 @@
     font-size: 0.85em;
     color: var(--text-secondary);
   }
+
+
+  .model-selection-container {
+    background-color: var(--card-bg);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.model-role {
+    margin-bottom: 24px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    padding: 16px;
+    transition: box-shadow 0.2s ease;
+    background-color: rgba(255,255,255,0.02);
+}
+
+.model-role:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.role-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.role-title {
+    font-weight: 600;
+    font-size: 1.05em;
+    color: var(--text);
+}
+
+.role-icon {
+    color: var(--primary);
+    font-size: 1.2em;
+    margin-right: 8px;
+}
+
+.role-description {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.selected-model {
+    background-color: rgba(76, 104, 215, 0.08);
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-top: 10px;
+    border-left: 3px solid var(--primary);
+    font-size: 0.9em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text);
+}
+
+.model-badge {
+    display: inline-block;
+    font-size: 0.75em;
+    padding: 3px 8px;
+    border-radius: 12px;
+    background-color: rgba(76, 104, 215, 0.2);
+    color: var(--primary);
+}
+
+.model-card {
+  color: var(--text);
+}
+
+.model-name {
+  color: var(--text);
+}
+
+.model-id {
+  color: var(--text-secondary);
+}
+
+.model-description {
+  color: var(--text-secondary);
+}
+
+.model-badge {
+  color: var(--text-on-primary);
+}
+
+.badge-available {
+  color: var(--success) !important;
+}
+
+.badge-not-available {
+  color: var(--text-secondary) !important;
+}
+
+h3, h4, p {
+  color: var(--text);
+}
+
+.section-card {
+  color: var(--text);
+}
+
+.review-container {
+  background-color: var(--card-bg);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px var(--shadow);
+}
+
+.review-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 15px;
+}
+
+.review-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.iteration-badge {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--primary);
+  color: white;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.guidance-box {
+  background-color: rgba(76, 104, 215, 0.1);
+  border-left: 4px solid var(--primary);
+  padding: 16px;
+  margin: 15px 0;
+  border-radius: 5px;
+  color: var(--text);
+}
+
+.guidance-title {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.guidance-icon {
+  margin-right: 8px;
+  font-size: 1.1rem;
+}
+
+.analysis-box {
+  background-color: rgba(255, 193, 7, 0.1);
+  border-left: 4px solid var(--warning);
+  padding: 16px;
+  margin: 15px 0;
+  border-radius: 5px;
+  color: var(--text);
+}
+
+.review-history-box {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 15px;
+  margin-top: 10px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.review-textarea textarea {
+  background-color: var(--card-bg) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 5px !important;
+  padding: 12px !important;
+  font-family: 'Roboto Mono', monospace !important;
+  font-size: 0.9rem !important;
+  min-height: 250px !important;
+  color: var(--text) !important;
+}
+
+.button-container {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.submit-button {
+  flex: 3;
+}
+
+.clear-button {
+  flex: 1;
+}

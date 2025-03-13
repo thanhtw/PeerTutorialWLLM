@@ -66,17 +66,7 @@ inject_custom_css()
 
 if not load_css(css_directory=css_dir):
     # Fallback to inline CSS if loading fails
-    logger.warning("Failed to load CSS files, falling back to inline CSS")
-    st.markdown("""
-        <style>
-        /* Minimal fallback styling */
-        .main .block-container {
-            padding-top: 1rem;
-            padding-bottom: 1rem;
-            max-width: 1200px;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+    logger.warning("Failed to load CSS files, falling back to inline CSS")  
 
 def init_session_state():
     """Initialize session state variables."""
@@ -302,46 +292,6 @@ def render_status_sidebar(llm_manager: LLMManager):
     
     # Status indicators with better styling
     st.markdown("""
-        <style>
-            .status-container {
-                background-color: #f8f9fa;
-                border-radius: 8px;
-                padding: 12px;
-                margin-bottom: 15px;
-            }
-            .status-item {
-                display: flex;
-                align-items: center;
-                margin-bottom: 10px;
-            }
-            .status-text {
-                margin-left: 10px;
-                flex-grow: 1;
-            }
-            .status-badge {
-                padding: 3px 8px;
-                border-radius: 12px;
-                font-size: 12px;
-                font-weight: bold;
-            }
-            .badge-ok {
-                background-color: #d4edda;
-                color: #155724;
-            }
-            .badge-error {
-                background-color: #f8d7da;
-                color: #721c24;
-            }
-            .badge-warning {
-                background-color: #fff3cd;
-                color: #856404;
-            }
-            .about-box {                
-                border-radius: 8px;
-                padding: 15px;
-                margin-top: 20px;
-            }
-        </style>
         <div class="status-container">
     """, unsafe_allow_html=True)
     
@@ -825,7 +775,7 @@ def main():
     # Header with improved styling
     st.markdown("""
     <div style="text-align: center; margin-bottom: 20px;">
-        <h1 style="color: #4c68d7; margin-bottom: 5px;">Java Code Review Training System</h1>
+        <h1 style="color: rgb(178 185 213); margin-bottom: 5px;">Java Code Review Training System</h1>
         <p style="font-size: 1.1rem; color: #666;">Learn and practice Java code review skills with AI-generated exercises</p>
     </div>
     """, unsafe_allow_html=True)

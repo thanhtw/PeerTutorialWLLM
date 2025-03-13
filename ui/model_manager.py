@@ -65,48 +65,7 @@ class ModelManagerUI:
         """
         st.header("Ollama Model Management")
         
-        # Add essential text color fixes
-        st.markdown("""
-        <style>
-        /* Ensure text is visible in both light and dark modes */
-        .model-card {
-            color: var(--text);
-        }
-        
-        .model-name {
-            color: var(--text);
-        }
-        
-        .model-id {
-            color: var(--text-secondary);
-        }
-        
-        .model-description {
-            color: var(--text-secondary);
-        }
-        
-        .model-badge {
-            color: var(--text-on-primary);
-        }
-        
-        .badge-available {
-            color: var(--success) !important;
-        }
-        
-        .badge-not-available {
-            color: var(--text-secondary) !important;
-        }
-        
-        h3, h4, p {
-            color: var(--text);
-        }
-        
-        .section-card {
-            color: var(--text);
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        
+                
         # Check connection to Ollama
         connection_status, message = self.llm_manager.check_ollama_connection()
         
@@ -304,81 +263,7 @@ class ModelManagerUI:
         
         Returns:
             Dictionary with selected models for each role
-        """
-        # Custom CSS for professional table styling with proper text colors
-        st.markdown("""
-        <style>
-        .model-selection-container {
-            background-color: var(--card-bg);
-            border-radius: 10px;
-            border: 1px solid var(--border);
-            padding: 20px;
-            margin-bottom: 24px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
-        
-        .model-role {
-            margin-bottom: 24px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            padding: 16px;
-            transition: box-shadow 0.2s ease;
-            background-color: rgba(255,255,255,0.02);
-        }
-        
-        .model-role:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        }
-        
-        .role-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        
-        .role-title {
-            font-weight: 600;
-            font-size: 1.05em;
-            color: var(--text);
-        }
-        
-        .role-icon {
-            color: var(--primary);
-            font-size: 1.2em;
-            margin-right: 8px;
-        }
-        
-        .role-description {
-            font-size: 0.85em;
-            color: var(--text-secondary);
-            margin-bottom: 12px;
-        }
-        
-        .selected-model {
-            background-color: rgba(76, 104, 215, 0.08);
-            padding: 8px 12px;
-            border-radius: 6px;
-            margin-top: 10px;
-            border-left: 3px solid var(--primary);
-            font-size: 0.9em;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: var(--text);
-        }
-        
-        .model-badge {
-            display: inline-block;
-            font-size: 0.75em;
-            padding: 3px 8px;
-            border-radius: 12px;
-            background-color: rgba(76, 104, 215, 0.2);
-            color: var(--primary);
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        
+        """        
         st.markdown("<h3 style='color: var(--text);'>Model Configuration</h3>", unsafe_allow_html=True)
         st.markdown("<p style='color: var(--text-secondary);'>Select which model to use for each stage of the code review process:</p>", unsafe_allow_html=True)
         

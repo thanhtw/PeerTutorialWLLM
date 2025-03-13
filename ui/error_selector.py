@@ -57,41 +57,7 @@ class ErrorSelectorUI:
         """
         st.subheader("Select Specific Error Categories")
         
-        # Add CSS for nested subcategory display
-        st.markdown("""
-        <style>
-            .subcategory-container {
-                margin-left: 20px;
-                border-left: 2px solid #e6e6e6;
-                padding-left: 10px;
-            }
-            .error-item {
-                margin: 5px 0;
-                padding: 3px 0;
-                font-size: 0.9em;
-            }
-            .category-header {
-                font-weight: bold;
-                margin-top: 10px;
-                background-color: #f1f1f1;
-                padding: 5px;
-                border-radius: 5px;
-            }
-            .error-type-header {
-                background-color: #4658b5;
-                color: white;
-                padding: 10px;
-                border-radius: 5px;
-                margin: 10px 0;
-                font-weight: bold;
-            }
-            .error-category {
-                border-left: 3px solid #2196F3;
-                padding-left: 10px;
-                margin: 5px 0;
-            }
-        </style>
-        """, unsafe_allow_html=True)
+        # Add CSS for nested subcategory display       
         
         build_categories = all_categories.get("build", [])
         checkstyle_categories = all_categories.get("checkstyle", [])
@@ -400,44 +366,7 @@ class ErrorSelectorUI:
         st.markdown("Select the categories of issues you want to find in the generated code:")
         
         # Create a more professional card-based selection
-        st.markdown("""
-        <style>
-        .problem-area-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 12px;
-            margin-top: 15px;
-            margin-bottom: 20px;
-        }
-        .problem-area-card {
-            padding: 16px;
-            border-radius: 8px;
-            border: 1px solid #e0e0e0;
-            transition: all 0.2s ease;
-            cursor: pointer;
-        }
-        .problem-area-card.selected {
-            border-color: #4c68d7;
-            background-color: rgba(76, 104, 215, 0.1);
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-        }
-        .problem-area-title {
-            font-weight: 600;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .problem-area-title .icon {
-            color: #4c68d7;
-        }
-        .problem-area-description {
-            font-size: 0.85em;
-            color: #666;
-            margin-bottom: 0;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+      
         
         # Problem area definitions with icons and descriptions
         problem_areas_config = {
@@ -543,38 +472,8 @@ class ErrorSelectorUI:
         if "code_length" not in st.session_state:
             st.session_state.code_length = "Medium"
         
-        st.markdown("### Code Generation Parameters")
-        
-        # Add some custom styling for the parameters
-        st.markdown("""
-        <style>
-        .param-container {
-            background-color: var(--card-bg);
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            padding: 16px;
-            margin-bottom: 20px;
-        }
-        .param-title {
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--text);
-        }
-        .param-description {
-            font-size: 0.85em;
-            color: var(--text-secondary);
-            margin-bottom: 10px;
-        }
-        .param-value {
-            font-weight: 500;
-            margin-top: 8px;
-            padding: 8px 12px;
-            background-color: rgba(76, 104, 215, 0.1);
-            border-radius: 4px;
-            border-left: 3px solid #4c68d7;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+        st.markdown("### Code Generation Parameters")      
+       
         
         st.markdown('<div class="param-container">', unsafe_allow_html=True)
         
