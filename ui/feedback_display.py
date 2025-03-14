@@ -245,7 +245,7 @@ class FeedbackDisplayUI:
         for i, issue in enumerate(identified_problems, 1):
             st.markdown(
                 f"""
-                <div style="background-color: #e8f5e9; border-left: 4px solid #4CAF50; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                <div style="border-left: 4px solid #4CAF50; padding: 10px; margin: 10px 0; border-radius: 4px;">
                 <strong>✓ {i}. {issue}</strong>
                 </div>
                 """, 
@@ -265,7 +265,7 @@ class FeedbackDisplayUI:
         for i, issue in enumerate(missed_problems, 1):
             st.markdown(
                 f"""
-                <div style="background-color: #ffebee; border-left: 4px solid #f44336; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                <div style="border-left: 4px solid #f44336; padding: 10px; margin: 10px 0; border-radius: 4px;">
                 <strong>✗ {i}. {issue}</strong>
                 </div>
                 """, 
@@ -285,7 +285,7 @@ class FeedbackDisplayUI:
         for i, issue in enumerate(false_positives, 1):
             st.markdown(
                 f"""
-                <div style="background-color: #fff8e1; border-left: 4px solid #ffc107; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                <div style="border-left: 4px solid #ffc107; padding: 10px; margin: 10px 0; border-radius: 4px;">
                 <strong>⚠ {i}. {issue}</strong>
                 <p>This wasn't actually an issue in the code.</p>
                 </div>

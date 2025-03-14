@@ -14,6 +14,7 @@ import psutil
 import subprocess
 from typing import Dict, Any, Optional, List, Union, Tuple
 from dotenv import load_dotenv
+import inspect
 from functools import lru_cache
 
 # Update import to use the newer package
@@ -496,21 +497,61 @@ class LLMManager:
             # Initialize Ollama model with parameters
             temperature = model_params.get("temperature", 0.7)
             
-            # Extract additional parameters
-            additional_params = {k: v for k, v in model_params.items() if k != "temperature"}
+            # Separate Ollama-specific parameters from other parameters
+            ollama_params = {}
             
-            # Remove potentially problematic parameters (max_tokens)
-            if "max_tokens" in additional_params:
-                logger.info(f"Removing max_tokens parameter to avoid Ollama validation error")
-                del additional_params["max_tokens"]
+            # Only include supported parameters
+            # Note: Different versions of the Ollama client support different parameters
+            supported_params = [
+                "temperature", 
+                "model", 
+                "base_url", 
+                "keep_alive",
+                "num_ctx",
+                "repeat_penalty",
+                "top_k",
+                "top_p"
+            ]
             
-            # Create the Ollama model
-            llm = Ollama(
-                base_url=self.ollama_base_url,
-                model=model_name,
-                temperature=temperature,
-                **additional_params
-            )
+            # Extract supported parameters
+            for key, value in model_params.items():
+                if key in supported_params:
+                    ollama_params[key] = value
+            
+            # Handle GPU layers separately as a model kwarg
+            if "n_gpu_layers" in model_params:
+                # Some versions use num_gpu instead of n_gpu_layers
+                gpu_layers = model_params["n_gpu_layers"]
+                
+                # Try to use num_gpu parameter via model_kwargs if available
+                if hasattr(Ollama, "model_kwargs") or "model_kwargs" in inspect.signature(Ollama.__init__).parameters:
+                    ollama_params["model_kwargs"] = {"num_gpu": gpu_layers}
+                else:
+                    # Older versions - try direct parameter
+                    logger.info(f"Using older Ollama client style for GPU layers: {gpu_layers}")
+                    # Only include if positive to avoid validation errors
+                    if gpu_layers > 0:
+                        ollama_params["num_gpu"] = gpu_layers
+            
+            # Log the parameters being used
+            logger.info(f"Initializing model {model_name} with params: {ollama_params}")
+            
+            # Create the Ollama model 
+            try:
+                llm = Ollama(
+                    base_url=self.ollama_base_url,
+                    model=model_name,
+                    temperature=temperature,
+                    **ollama_params
+                )
+            except TypeError as e:
+                # If the above fails due to unexpected parameters, try with minimal params
+                logger.warning(f"Error with full params: {str(e)}, trying minimal params")
+                llm = Ollama(
+                    base_url=self.ollama_base_url,
+                    model=model_name,
+                    temperature=temperature
+                )
             
             # Check if reasoning mode is enabled
             reasoning_mode = os.getenv("REASONING_MODE", "false").lower() == "true"
@@ -603,10 +644,9 @@ class LLMManager:
         Returns:
             Dict[str, Any]: Default parameters for the model
         """
-        # Basic defaults - REMOVED max_tokens to avoid validation errors
+        # Basic defaults - without problematic parameters
         params = {
             "temperature": 0.7,
-            # Removed max_tokens parameter - caused validation errors with some Ollama versions
         }
         
         # Add appropriate system message for specific model types
@@ -631,10 +671,12 @@ class LLMManager:
         if self.force_gpu:
             gpu_info = self.check_gpu_availability()
             if gpu_info.get("has_gpu", False):
-                # Add GPU-specific parameters
+                # Add GPU-specific parameters - n_gpu_layers will be handled separately
                 params["n_gpu_layers"] = self.gpu_layers  # Use specified number of GPU layers
-                params["f16_kv"] = True  # Use half-precision for key/value cache (saves GPU memory)
-                params["logits_all"] = False  # Don't compute logits for all tokens (faster)
+                
+                # We'll remove these parameters that cause validation errors with some clients
+                # params["f16_kv"] = True  # Removed to avoid validation errors
+                # params["logits_all"] = False  # Removed to avoid validation errors
         
         return params
     
@@ -845,12 +887,11 @@ class LLMManager:
             # Add GPU parameters to model configuration
             updated_params = model_params.copy()
             
-            # Set number of GPU layers
+            # Set number of GPU layers - this will be handled by the initialize_model method
             updated_params["n_gpu_layers"] = self.gpu_layers  # Use specified number of GPU layers
             
-            # Add other GPU optimizations
-            updated_params["f16_kv"] = True  # Use half-precision for key/value cache (saves GPU memory)
-            updated_params["logits_all"] = False  # Don't compute all logits (faster)
+            # Don't add f16_kv directly as it's not supported by some Ollama client versions
+            # Instead, we'll use it as a model parameter if supported
             
             # If we have GPU memory information, adjust parameters based on available memory
             if "memory_total" in gpu_info and isinstance(gpu_info["memory_total"], (int, float)):
@@ -858,11 +899,9 @@ class LLMManager:
                 
                 if memory_gb < 4:
                     # Very limited GPU memory - be more conservative
-                    updated_params["f16_kv"] = True
                     updated_params["n_gpu_layers"] = min(24, self.gpu_layers if self.gpu_layers > 0 else 999)
                 elif memory_gb < 8:
                     # Limited GPU memory
-                    updated_params["f16_kv"] = True
                     updated_params["n_gpu_layers"] = min(32, self.gpu_layers if self.gpu_layers > 0 else 999)
             
             logger.info(f"Enabled GPU acceleration with {gpu_info['gpu_name']}")

@@ -453,7 +453,7 @@ class ErrorSelectorUI:
             badges_html = ""
             for area in problem_areas:
                 config = problem_areas_config.get(area, {"icon": ""})
-                badges_html += f'<span style="background-color: rgba(76, 104, 215, 0.1); color: #4c68d7; padding: 6px 12px; border-radius: 16px; margin-right: 10px; font-size: 0.9em; display: inline-flex; align-items: center; border: 1px solid rgba(76, 104, 215, 0.3);"><span style="margin-right: 5px;">{config["icon"]}</span> {area}</span>'
+                badges_html += f'<span style="color: #4c68d7; padding: 6px 12px; border-radius: 16px; margin-right: 10px; font-size: 0.9em; display: inline-flex; align-items: center; border: 1px solid rgba(76, 104, 215, 0.3);"><span style="margin-right: 5px;">{config["icon"]}</span> {area}</span>'
             
             st.markdown(f"<div style='margin-top: 10px;'>{badges_html}</div>", unsafe_allow_html=True)
         
