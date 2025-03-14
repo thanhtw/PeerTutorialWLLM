@@ -59,9 +59,9 @@ class StudentResponseEvaluator:
         return self._evaluate_with_llm(code_snippet, known_problems, student_review)
         
     def _evaluate_with_llm(self, 
-                          code_snippet: str,
-                          known_problems: List[str],
-                          student_review: str) -> Dict[str, Any]:
+                      code_snippet: str,
+                      known_problems: List[str],
+                      student_review: str) -> Dict[str, Any]:
         """
         Evaluate a student's review using a language model.
         
@@ -75,68 +75,105 @@ class StudentResponseEvaluator:
         """
         if not self.llm:
             logger.warning("No LLM provided, falling back to programmatic evaluation")
+            return self._fallback_evaluation(known_problems)  # Add this fallback method
             
         # Create a detailed prompt for the LLM
         system_prompt = """You are an expert code review analyzer. When analyzing student reviews:
-1. Be thorough and accurate in your assessment
-2. Return your analysis in valid JSON format with proper escaping
-3. Provide constructive feedback that helps students improve
-4. Be precise in identifying which problems were found and which were missed
-5. Format your response as proper JSON
-6. Written entirely in Traditional Chinese (繁體中文)
-"""
+    1. Be thorough and accurate in your assessment
+    2. Return your analysis in valid JSON format with proper escaping
+    3. Provide constructive feedback that helps students improve
+    4. Be precise in identifying which problems were found and which were missed
+    5. Format your response as proper JSON
+    """
         
         prompt = f"""
-Please analyze how well the student's review identifies the known problems in the code.
+    Please analyze how well the student's review identifies the known problems in the code.
 
-ORIGINAL CODE:
-```java
-{code_snippet}
-```
+    ORIGINAL CODE:
+    ```java
+    {code_snippet}
+    ```
 
-KNOWN PROBLEMS IN THE CODE:
-{self._format_list(known_problems)}
+    KNOWN PROBLEMS IN THE CODE:
+    {self._format_list(known_problems)}
 
-STUDENT'S REVIEW:
-```
-{student_review}
-```
+    STUDENT'S REVIEW:
+    ```
+    {student_review}
+    ```
 
-Carefully analyze how thoroughly and accurately the student identified the known problems.
+    Carefully analyze how thoroughly and accurately the student identified the known problems.
 
-For each known problem, determine if the student correctly identified it, partially identified it, or missed it completely.
-Consider semantic matches - students may use different wording but correctly identify the same issue.
+    For each known problem, determine if the student correctly identified it, partially identified it, or missed it completely.
+    Consider semantic matches - students may use different wording but correctly identify the same issue.
 
-Return your analysis in this exact JSON format:
-```json
-{{
-  "identified_problems": ["Problem 1 they identified correctly", "Problem 2 they identified correctly"],
-  "missed_problems": ["Problem 1 they missed", "Problem 2 they missed"],
-  "false_positives": ["Non-issue 1 they incorrectly flagged", "Non-issue 2 they incorrectly flagged"],
-  "accuracy_percentage": 75.0,
-  "review_sufficient": true,
-  "feedback": "Your general assessment of the review quality and advice for improvement"
-}}
-```
+    Return your analysis in this exact JSON format:
+    ```json
+    {{
+    "identified_problems": ["Problem 1 they identified correctly", "Problem 2 they identified correctly"],
+    "missed_problems": ["Problem 1 they missed", "Problem 2 they missed"],
+    "false_positives": ["Non-issue 1 they incorrectly flagged", "Non-issue 2 they incorrectly flagged"],
+    "accuracy_percentage": 75.0,
+    "review_sufficient": true,
+    "feedback": "Your general assessment of the review quality and advice for improvement"
+    }}
+    ```
 
-A review is considered "sufficient" if the student correctly identified at least {self.min_identified_percentage}% of the known problems.
-Be specific in your feedback about what types of issues they missed and how they can improve their code review skills.
-"""
+    A review is considered "sufficient" if the student correctly identified at least {self.min_identified_percentage}% of the known problems.
+    Be specific in your feedback about what types of issues they missed and how they can improve their code review skills.
+    """
         
         try:
             # Get the evaluation from the LLM
             logger.info("Evaluating student review with LLM")
             response = self.llm.invoke(system_prompt + "\n\n" + prompt)
             
+            # Make sure we have a response
+            if not response:
+                logger.error("LLM returned None or empty response for review evaluation")
+                return self._fallback_evaluation(known_problems)
+            
             # Extract JSON data from the response
             analysis_data = self._extract_json_from_text(response)
+            
+            # Make sure we have analysis data
+            if not analysis_data or "error" in analysis_data:
+                logger.error(f"Failed to extract valid analysis data: {analysis_data.get('error', 'Unknown error')}")
+                return self._fallback_evaluation(known_problems)
             
             # Process the analysis data
             return self._process_analysis_data(analysis_data, known_problems)
             
         except Exception as e:
             logger.error(f"Error evaluating review with LLM: {str(e)}")
-           
+            return self._fallback_evaluation(known_problems)
+
+# Add this new fallback method to core/student_response_evaluator.py
+    def _fallback_evaluation(self, known_problems: List[str]) -> Dict[str, Any]:
+        """
+        Generate a fallback evaluation when the LLM fails.
+        
+        Args:
+            known_problems: List of known problems in the code
+            
+        Returns:
+            Basic evaluation dictionary
+        """
+        logger.warning("Using fallback evaluation due to LLM error")
+        
+        # Create a basic fallback evaluation
+        return {
+            "identified_problems": [],
+            "missed_problems": known_problems,
+            "false_positives": [],
+            "accuracy_percentage": 0.0,
+            "identified_percentage": 0.0,
+            "identified_count": 0,
+            "total_problems": len(known_problems),
+            "review_sufficient": False,
+            "feedback": "Your review needs improvement. Try to identify more issues in the code."
+        }
+            
     def _extract_json_from_text(self, text: str) -> Dict[str, Any]:
         """
         Extract JSON data from LLM response text.
@@ -147,6 +184,10 @@ Be specific in your feedback about what types of issues they missed and how they
         Returns:
             Extracted JSON data
         """
+        # Handle None or empty text
+        if not text:
+            return {"error": "Empty response from LLM"}
+        
         try:
             # Try to find JSON block with regex
             patterns = [
@@ -180,6 +221,8 @@ Be specific in your feedback about what types of issues they missed and how they
                     analysis["identified_problems"] = json.loads(identified_str)
                 except:
                     analysis["identified_problems"] = []
+            else:
+                analysis["identified_problems"] = []
             
             # Try to extract missed problems
             missed_match = re.search(r'"missed_problems"\s*:\s*(\[.*?\])', text, re.DOTALL)
@@ -189,6 +232,8 @@ Be specific in your feedback about what types of issues they missed and how they
                     analysis["missed_problems"] = json.loads(missed_str)
                 except:
                     analysis["missed_problems"] = []
+            else:
+                analysis["missed_problems"] = []
             
             # Try to extract false positives
             false_pos_match = re.search(r'"false_positives"\s*:\s*(\[.*?\])', text, re.DOTALL)
@@ -198,6 +243,8 @@ Be specific in your feedback about what types of issues they missed and how they
                     analysis["false_positives"] = json.loads(false_pos_str)
                 except:
                     analysis["false_positives"] = []
+            else:
+                analysis["false_positives"] = []
             
             # Try to extract accuracy percentage
             accuracy_match = re.search(r'"accuracy_percentage"\s*:\s*([0-9.]+)', text)
@@ -206,16 +253,22 @@ Be specific in your feedback about what types of issues they missed and how they
                     analysis["accuracy_percentage"] = float(accuracy_match.group(1))
                 except:
                     analysis["accuracy_percentage"] = 0.0
+            else:
+                analysis["accuracy_percentage"] = 0.0
             
             # Try to extract review_sufficient
             sufficient_match = re.search(r'"review_sufficient"\s*:\s*(true|false)', text)
             if sufficient_match:
                 analysis["review_sufficient"] = sufficient_match.group(1) == "true"
+            else:
+                analysis["review_sufficient"] = False
             
             # Try to extract feedback
             feedback_match = re.search(r'"feedback"\s*:\s*"(.*?)"', text)
             if feedback_match:
                 analysis["feedback"] = feedback_match.group(1)
+            else:
+                analysis["feedback"] = "The analysis could not extract feedback."
             
             if analysis:
                 return analysis
@@ -235,8 +288,8 @@ Be specific in your feedback about what types of issues they missed and how they
             }
     
     def _process_analysis_data(self, 
-                              analysis_data: Dict[str, Any],
-                              known_problems: List[str]) -> Dict[str, Any]:
+                          analysis_data: Dict[str, Any],
+                          known_problems: List[str]) -> Dict[str, Any]:
         """
         Process and validate analysis data from the LLM.
         
@@ -247,10 +300,19 @@ Be specific in your feedback about what types of issues they missed and how they
         Returns:
             Processed and validated analysis data
         """
+        # Handle None case
+        if not analysis_data:
+            return self._fallback_evaluation(known_problems)
+        
         # Extract required fields with fallbacks
         identified_problems = analysis_data.get("identified_problems", [])
         missed_problems = analysis_data.get("missed_problems", [])
         false_positives = analysis_data.get("false_positives", [])
+        
+        # Ensure these are lists, not None
+        identified_problems = identified_problems if isinstance(identified_problems, list) else []
+        missed_problems = missed_problems if isinstance(missed_problems, list) else []
+        false_positives = false_positives if isinstance(false_positives, list) else []
         
         try:
             accuracy_percentage = float(analysis_data.get("accuracy_percentage", 50.0))
@@ -364,8 +426,7 @@ Your guidance is:
 2. Specific and actionable
 3. Educational - teaching students how to find issues rather than just telling them what to find
 4. Focused on developing their review skills
-5. Balanced - acknowledging what they did well while guiding them to improve
-6. Written entirely in Traditional Chinese (繁體中文)"""
+5. Balanced - acknowledging what they did well while guiding them to improve"""
         
         prompt = f"""
 Please create targeted guidance for a student who has reviewed Java code but missed some important errors.

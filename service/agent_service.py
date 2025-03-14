@@ -397,64 +397,61 @@ class AgentService:
                     error_instructions += f"   Suggestion: Use magic numbers instead of named constants\n"
                 else:
                     error_instructions += f"   Suggestion: Implement this style violation naturally\n"
-                
+                    
             error_instructions += "\n"
-        
 
-         # Check if reasoning mode is enabled
+        # Check if reasoning mode is enabled
         reasoning_mode = os.getenv("REASONING_MODE", "false").lower() == "true"
         # Create the full prompt
         if reasoning_mode:
             prompt = f"""You are an expert Java programming educator who creates code review exercises with intentional errors.
 
-                        Please create a {code_length} Java code example for a {domain} system with {complexity_profile}.
-                        The code should be realistic, well-structured, and include the following specific errors:
+    Please create a {code_length} Java code example for a {domain} system with {complexity_profile}.
+    The code should be realistic, well-structured, and include the following specific errors:
 
-                        {error_instructions}
+    {error_instructions}
 
-                        Let's think through this step by step:
+    Let's think through this step by step:
 
-                        1. First, I'll design the overall structure of the Java application for a {domain} system.
-                        2. Then, I'll identify where each error should be placed to create a realistic learning scenario.
-                        3. Next, I'll implement the code with these intentional errors in a way that maintains realism.
-                        4. Finally, I'll review the code to ensure all required errors are present and the code is otherwise valid.
+    1. First, I'll design the overall structure of the Java application for a {domain} system.
+    2. Then, I'll identify where each error should be placed to create a realistic learning scenario.
+    3. Next, I'll implement the code with these intentional errors in a way that maintains realism.
+    4. Finally, I'll review the code to ensure all required errors are present and the code is otherwise valid.
 
-                        Requirements:
-                        1. Write a complete, compilable Java code (except for the intentional errors)
-                        2. Make the code realistic and representative of actual Java applications
-                        3. For each error you include:
-                        - Make sure it exactly matches the description provided
-                        - Place it at a logical location in the code
-                        - Ensure it's recognizable to a student with beginner to intermediate Java knowledge
-                        - Add brief comments nearby (using // Comment format) that hint at the error without directly stating it
-                        4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
-                        5. Written entirely in Traditional Chinese (A�-�)
-                        I'll now create the Java code with the required errors: """
+    Requirements:
+    1. Write a complete, compilable Java code (except for the intentional errors)
+    2. Make the code realistic and representative of actual Java applications
+    3. For each error you include:
+    - Make sure it exactly matches the description provided
+    - Place it at a logical location in the code
+    - Ensure it's recognizable to a student with beginner to intermediate Java knowledge
+    - Add brief comments nearby (using // Comment format) that hint at the error without directly stating it
+    4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
 
+    I'll now create the Java code with the required errors:
+    """
         else:      
-        # Create the full prompt
+            # Create the full prompt
             prompt = f"""You are an expert Java programming educator who creates code review exercises with intentional errors.
 
-                Please create a {code_length} Java code example for a {domain} system with {complexity_profile}.
-                The code should be realistic, well-structured, and include the following specific errors:
+    Please create a {code_length} Java code example for a {domain} system with {complexity_profile}.
+    The code should be realistic, well-structured, and include the following specific errors:
 
-                {error_instructions}
+    {error_instructions}
 
-                Requirements:
-                1. Write a complete, compilable Java code (except for the intentional errors)
-                2. Make the code realistic and representative of actual Java applications
-                3. For each error you include:
-                - Make sure it exactly matches the description provided
-                - Place it at a logical location in the code
-                - Ensure it's recognizable to a student with beginner to intermediate Java knowledge
-                - Add brief comments nearby (using // Comment format) that hint at the error without directly stating it
-                4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
-                5. Written entirely in Traditional Chinese (A�-�)
+    Requirements:
+    1. Write a complete, compilable Java code (except for the intentional errors)
+    2. Make the code realistic and representative of actual Java applications
+    3. For each error you include:
+    - Make sure it exactly matches the description provided
+    - Place it at a logical location in the code
+    - Ensure it's recognizable to a student with beginner to intermediate Java knowledge
+    - Add brief comments nearby (using // Comment format) that hint at the error without directly stating it
+    4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
 
-                Return ONLY the Java code with the errors included. Do not include any explanations or JSON formatting.
-                All comments, hints and documentation text in the code should be in Traditional Chinese (A�-�).
-                """
-                
+    Return ONLY the Java code with the errors included. Do not include any explanations or JSON formatting.
+    """
+            
         return prompt
     
     def _extract_code_from_response(self, response: str) -> str:

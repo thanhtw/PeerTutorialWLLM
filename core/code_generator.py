@@ -96,7 +96,7 @@ class CodeGenerator:
         Returns:
             Generated Java code as a string
         """
-      
+    
         # Select a domain if not provided
         if not domain:
             domain = random.choice(self.domains)
@@ -112,11 +112,20 @@ class CodeGenerator:
             # Extract the Java code from the response
             code = self._extract_code_from_response(response)
             
-          
+            # Return the generated code
             return code
             
         except Exception as e:
             logger.error(f"Error generating code with LLM: {str(e)}")
+            # Return a fallback code snippet instead of None
+            return """
+    // Fallback code - Simple Java class
+    public class FallbackExample {
+        public static void main(String[] args) {
+            System.out.println("Hello, World!");
+        }
+    }
+    """
            
     def _extract_code_from_response(self, response: str) -> str:
         """
@@ -166,7 +175,6 @@ Requirements:
 - Follow standard Java naming conventions and best practices
 - Make the code realistic and representative of real-world Java applications
 - Do NOT include any intentional errors or problems
-- Written entirely in Traditional Chinese (繁體中文)
 
 Return only the Java code with no additional explanations.
 ```java
