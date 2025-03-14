@@ -470,6 +470,20 @@ class JavaCodeReviewGraph:
         # Create report header
         report = "# Detailed Comparison: Your Review vs. Actual Issues\n\n"
         
+        # New section explaining the comparison method
+        report += "## How Reviews Are Compared\n\n"
+        report += "Your review is compared to the known problems in the code using a semantic matching approach. "
+        report += "This means we look for whether you've identified the key aspects of each issue, rather than requiring exact matching phrases.\n\n"
+        
+        report += "For each issue, the system checks if your comments include:\n"
+        report += "1. **The correct location** of the error (line numbers, method names, etc.)\n"
+        report += "2. **The appropriate error type or category** (e.g., NullPointerException, naming convention)\n"
+        report += "3. **A clear explanation** of why it's problematic\n\n"
+        
+        report += "A problem is considered 'identified' if you correctly mentioned its key aspects. "
+        report += "Partial credit may be given for partially identified issues. "
+        report += "False positives are issues you reported that don't match any actual problems in the code.\n\n"
+        
         # Problems section
         report += "## Code Issues Analysis\n\n"
         
@@ -492,27 +506,46 @@ class JavaCodeReviewGraph:
                 report += "Great job finding this issue! "
                 report += "This demonstrates your understanding of this type of problem.\n\n"
         
-        # Issues missed
+        # Issues missed with detailed guidance
         if missed_problems_str:
             report += "### Issues You Missed\n\n"
             for i, problem in enumerate(missed_problems_str, 1):
                 report += f"**{i}. {problem}**\n\n"
-                report += "You didn't identify this issue. "
                 
-                # Add some specific guidance based on the problem type
+                # Enhanced guidance with example comment format
                 problem_lower = problem.lower()
-                if "null" in problem_lower:
-                    report += "When reviewing code, always check for potential null references and proper null handling.\n\n"
+                report += "**How to identify this issue:**\n\n"
+                
+                if "null" in problem_lower or "nullpointer" in problem_lower:
+                    report += "When reviewing Java code, look for variables that might be null before being accessed. "
+                    report += "Check for null checks before method calls or field access. Missing null checks often lead to NullPointerExceptions at runtime.\n\n"
+                    report += "**Example comment format:**\n\n"
+                    report += "`Line X: [NullPointerException Risk] - The variable 'name' is accessed without a null check, which could cause a runtime exception`\n\n"
                 elif "naming" in problem_lower or "convention" in problem_lower:
-                    report += "Pay attention to naming conventions in Java. Classes should use UpperCamelCase, while methods and variables should use lowerCamelCase.\n\n"
-                elif "javadoc" in problem_lower or "comment" in problem_lower:
-                    report += "Remember to check for proper documentation. Methods should have complete Javadoc comments with @param and @return tags where appropriate.\n\n"
-                elif "exception" in problem_lower or "throw" in problem_lower:
-                    report += "Always verify that exceptions are either caught or declared in the method signature with 'throws'.\n\n"
-                elif "loop" in problem_lower or "condition" in problem_lower:
-                    report += "Carefully examine loop conditions for off-by-one errors or potential infinite loops.\n\n"
+                    report += "Check that class names use UpperCamelCase, while methods and variables use lowerCamelCase. "
+                    report += "Constants should use UPPER_SNAKE_CASE. Consistent naming improves code readability and maintainability.\n\n"
+                    report += "**Example comment format:**\n\n"
+                    report += "`Line X: [Naming Convention] - The variable 'user_name' should use lowerCamelCase format (userName)`\n\n"
+                elif "equal" in problem_lower or "==" in problem_lower:
+                    report += "String and object comparisons should use the .equals() method instead of the == operator, which only compares references. "
+                    report += "Using == for content comparison is a common error that can lead to unexpected behavior.\n\n"
+                    report += "**Example comment format:**\n\n"
+                    report += "`Line X: [Object Comparison] - String comparison uses == operator instead of .equals() method`\n\n"
+                elif "array" in problem_lower or "index" in problem_lower:
+                    report += "Always verify that array indices are within valid ranges before accessing elements. "
+                    report += "Check for potential ArrayIndexOutOfBoundsException risks, especially in loops.\n\n"
+                    report += "**Example comment format:**\n\n"
+                    report += "`Line X: [Array Bounds] - Array access without bounds checking could cause ArrayIndexOutOfBoundsException`\n\n"
+                elif "whitespace" in problem_lower or "indent" in problem_lower:
+                    report += "Look for consistent indentation and proper whitespace around operators and keywords. "
+                    report += "Proper formatting makes code more readable and maintainable.\n\n"
+                    report += "**Example comment format:**\n\n"
+                    report += "`Line X: [Formatting] - Inconsistent indentation makes the code hard to read`\n\n"
                 else:
-                    report += "This is something to look for in future code reviews.\n\n"
+                    report += "When identifying issues, be specific about the location, type of error, and why it's problematic. "
+                    report += "Include line numbers and detailed explanations in your comments.\n\n"
+                    report += "**Example comment format:**\n\n"
+                    report += "`Line X: [Error Type] - Description of the issue and why it's problematic`\n\n"
         
         # False positives
         if false_positives_str:
@@ -590,6 +623,24 @@ For more thorough code reviews, try this systematic approach:
 4. **Final pass**: Look for performance issues, security concerns, and maintainability problems
 
 By following a structured approach, you'll catch more issues and provide more comprehensive reviews.
+"""
+        
+        # Add effective comment format
+        report += """
+### Effective Comment Format
+
+When writing code review comments, use this format for clarity and consistency:
+
+```
+Line X: [Error Type] - Description of the issue and why it's problematic
+```
+
+For example:
+```
+Line 42: [NullPointerException Risk] - The 'user' variable could be null here, add a null check before calling methods
+```
+
+This format helps others quickly understand the location, type, and impact of each issue.
 """
         
         return report

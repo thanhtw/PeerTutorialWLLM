@@ -79,12 +79,23 @@ class StudentResponseEvaluator:
             
         # Create a detailed prompt for the LLM
         system_prompt = """You are an expert code review analyzer. When analyzing student reviews:
-    1. Be thorough and accurate in your assessment
-    2. Return your analysis in valid JSON format with proper escaping
-    3. Provide constructive feedback that helps students improve
-    4. Be precise in identifying which problems were found and which were missed
-    5. Format your response as proper JSON
-    """
+1. Be thorough and accurate in your assessment
+2. Return your analysis in valid JSON format with proper escaping
+3. Provide constructive feedback that helps students improve
+4. Be precise in identifying which problems were found and which were missed
+5. Format your response as proper JSON
+
+COMPARISON METHOD:
+When comparing student reviews to known problems:
+1. Look for semantic matches, not just exact phrase matches
+2. Consider a problem identified if the student mentions the key aspects of the issue, such as:
+   - The correct location or context of the error (line number, method, class)
+   - The appropriate error type or category (e.g., NullPointerException, naming convention)
+   - A clear description of why it's problematic
+3. If a student identifies a location and a type of error that matches a known problem, count it as identified
+4. Partial credit can be given for partially identified issues (where the student found some aspects but missed others)
+5. False positives are issues reported by the student that don't match any known problems
+"""
         
         prompt = f"""
     Please analyze how well the student's review identifies the known problems in the code.
@@ -417,7 +428,7 @@ class StudentResponseEvaluator:
         """
         if not self.llm:
             logger.warning("No LLM provided, falling back to programmatic guidance generation")
-            
+        
         
         # Create a detailed prompt for the LLM
         system_prompt = """You are an expert Java programming mentor who provides constructive feedback to students.
@@ -454,11 +465,17 @@ The student has identified {review_analysis.get("identified_count", 0)} out of {
 
 Create constructive guidance that:
 1. Acknowledges what the student found correctly with specific praise
-2. Provides hints about the types of errors they missed (without directly listing them all)
-3. Suggests specific areas of the code to examine more carefully
-4. Encourages them to look for particular Java error patterns they may have overlooked
-5. If there are false positives, gently explain why those are not actually issues
-6. End with specific questions that might help the student find the missed problems
+
+2. For each missed error, provide:
+   - A specific hint about the type of error
+   - The area of code to examine (e.g., which method or lines)
+   - How to recognize this type of error in the future
+   - A sample comment format they could use to report this type of error, following this pattern:
+     "Line X: [Error Type] - Description of the issue and why it's problematic"
+
+3. If there are false positives, gently explain why those are not actually issues
+
+4. End with specific questions that might help the student find the missed problems
 
 The guidance should be educational and help the student improve their Java code review skills.
 Focus on teaching them how to identify the types of issues they missed.
@@ -475,6 +492,3 @@ Be encouraging but specific. Help the student develop a more comprehensive appro
             
         except Exception as e:
             logger.error(f"Error generating guidance with LLM: {str(e)}")
-            
-    
-    

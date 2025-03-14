@@ -7,6 +7,7 @@ to include in the generated code problems.
 
 import streamlit as st
 import logging
+import random
 from typing import List, Dict, Any, Optional, Tuple, Callable
 
 # Configure logging
@@ -47,7 +48,7 @@ class ErrorSelectorUI:
     
     def render_category_selection(self, all_categories: Dict[str, List[str]]) -> Dict[str, List[str]]:
         """
-        Render the error category selection UI.
+        Render the error category selection UI for advanced mode.
         
         Args:
             all_categories: Dictionary with 'build' and 'checkstyle' categories
@@ -57,7 +58,12 @@ class ErrorSelectorUI:
         """
         st.subheader("Select Specific Error Categories")
         
-        # Add CSS for nested subcategory display       
+        # Add help text explaining how this mode works
+        st.info("""
+        **Advanced Mode**: Select specific error categories to include in the generated code. 
+        When you select a category, the system will randomly choose errors from that category 
+        to include in the generated code.
+        """)
         
         build_categories = all_categories.get("build", [])
         checkstyle_categories = all_categories.get("checkstyle", [])
@@ -343,9 +349,9 @@ class ErrorSelectorUI:
         
         # Show help text for the selected mode
         if st.session_state.error_selection_mode == "standard":
-            st.info("Standard mode: Select general problem areas like Style, Logic, or Performance.")
+            st.info("Standard mode: Select general problem areas like Style, Logic, or Performance. The system will map these to specific error categories.")
         elif st.session_state.error_selection_mode == "advanced":
-            st.info("Advanced mode: Select specific error categories like LogicalErrors or NamingConventionChecks.")
+            st.info("Advanced mode: Select specific error categories like LogicalErrors or NamingConventionChecks. The system will randomly select errors from these categories.")
         else:
             st.info("Specific mode: Choose exactly which errors will appear in the generated code.")
         
@@ -365,30 +371,47 @@ class ErrorSelectorUI:
         st.markdown("#### Focus Areas for Code Review")
         st.markdown("Select the categories of issues you want to find in the generated code:")
         
-        # Create a more professional card-based selection
-      
-        
         # Problem area definitions with icons and descriptions
         problem_areas_config = {
             "Style": {
-                "icon": "✓",
-                "description": "Naming conventions, whitespace, formatting, and documentation issues"
+                "icon": "",
+                "description": "Naming conventions, whitespace, formatting, and documentation issues",
+                "mapping": {
+                    "build": [],
+                    "checkstyle": ["NamingConventionChecks", "WhitespaceAndFormattingChecks", "JavadocChecks"]
+                }
             },
             "Logical": {
-                "icon": "🧠",
-                "description": "Logic flaws, incorrect conditionals, off-by-one errors, and algorithm issues"
+                "icon": ">�",
+                "description": "Logic flaws, incorrect conditionals, off-by-one errors, and algorithm issues",
+                "mapping": {
+                    "build": ["LogicalErrors"],
+                    "checkstyle": []
+                }
             },
             "Performance": {
-                "icon": "⚡",
-                "description": "Inefficient code, unnecessary operations, resource leaks, and optimization issues"
+                "icon": "�",
+                "description": "Inefficient code, unnecessary operations, resource leaks, and optimization issues",
+                "mapping": {
+                    "build": ["RuntimeErrors"],
+                    "checkstyle": ["MetricsChecks"]
+                }
             },
             "Security": {
-                "icon": "🔒",
-                "description": "Potential vulnerabilities, input validation issues, and unsafe operations"
+                "icon": "=",
+                "description": "Potential vulnerabilities, input validation issues, and unsafe operations",
+                "mapping": {
+                    "build": ["RuntimeErrors", "LogicalErrors"],
+                    "checkstyle": ["CodeQualityChecks"]
+                }
             },
             "Design": {
-                "icon": "🏗️",
-                "description": "Poor class design, code organization, and maintainability problems"
+                "icon": "<�",
+                "description": "Poor class design, code organization, and maintainability problems",
+                "mapping": {
+                    "build": ["LogicalErrors"],
+                    "checkstyle": ["MiscellaneousChecks", "FileStructureChecks", "BlockChecks"]
+                }
             }
         }
         
@@ -456,6 +479,48 @@ class ErrorSelectorUI:
                 badges_html += f'<span style="color: #4c68d7; padding: 6px 12px; border-radius: 16px; margin-right: 10px; font-size: 0.9em; display: inline-flex; align-items: center; border: 1px solid rgba(76, 104, 215, 0.3);"><span style="margin-right: 5px;">{config["icon"]}</span> {area}</span>'
             
             st.markdown(f"<div style='margin-top: 10px;'>{badges_html}</div>", unsafe_allow_html=True)
+            
+            # Add explanation of mapping
+            with st.expander("How problem areas map to error categories"):
+                st.markdown("When you select problem areas, they map to specific error categories:")
+                for area in problem_areas:
+                    config = problem_areas_config.get(area, {"mapping": {"build": [], "checkstyle": []}})
+                    mapping = config["mapping"]
+                    
+                    st.markdown(f"**{area}** maps to:")
+                    
+                    if mapping["build"]:
+                        st.markdown("Build error categories:")
+                        for category in mapping["build"]:
+                            st.markdown(f"- {category}")
+                    
+                    if mapping["checkstyle"]:
+                        st.markdown("Checkstyle categories:")
+                        for category in mapping["checkstyle"]:
+                            st.markdown(f"- {category}")
+                    
+                    if not mapping["build"] and not mapping["checkstyle"]:
+                        st.markdown("No specific error categories")
+        
+        # Map problem areas to error categories - this is used by the application
+        selected_categories = {
+            "build": [],
+            "checkstyle": []
+        }
+        
+        # Build selected categories from problem areas
+        for area in problem_areas:
+            if area in problem_areas_config:
+                mapping = problem_areas_config[area]["mapping"]
+                for category in mapping["build"]:
+                    if category not in selected_categories["build"]:
+                        selected_categories["build"].append(category)
+                for category in mapping["checkstyle"]:
+                    if category not in selected_categories["checkstyle"]:
+                        selected_categories["checkstyle"].append(category)
+        
+        # Update session state with the mapping result
+        st.session_state.selected_error_categories = selected_categories
         
         return problem_areas
 

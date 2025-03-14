@@ -323,10 +323,59 @@ class JsonErrorRepository:
         
         # Otherwise use category-based selection
         elif selected_categories:
-            selected_errors = self.get_random_errors_by_categories(
-                selected_categories, 
-                count=adjusted_count
-            )
+            # Check if any categories are actually selected
+            build_categories = selected_categories.get("build", [])
+            checkstyle_categories = selected_categories.get("checkstyle", [])
+            
+            if not build_categories and not checkstyle_categories:
+                # Use default categories if none specified
+                selected_categories = {
+                    "build": ["CompileTimeErrors", "RuntimeErrors", "LogicalErrors"],
+                    "checkstyle": ["NamingConventionChecks", "WhitespaceAndFormattingChecks"]
+                }
+            
+            # Collect errors from each selected category
+            all_errors = []
+            
+            # Build errors - randomly select from each category
+            for category in selected_categories.get("build", []):
+                if category in self.build_errors:
+                    category_errors = self.build_errors[category]
+                    # For each selected category, randomly select 1-2 errors
+                    num_to_select = min(len(category_errors), random.randint(1, 2))
+                    if num_to_select > 0:
+                        selected_from_category = random.sample(category_errors, num_to_select)
+                        for error in selected_from_category:
+                            all_errors.append({
+                                "type": "build",
+                                "category": category,
+                                "name": error["error_name"],
+                                "description": error["description"],
+                                "implementation_guide": error.get("implementation_guide", "")
+                            })
+            
+            # Checkstyle errors - randomly select from each category
+            for category in selected_categories.get("checkstyle", []):
+                if category in self.checkstyle_errors:
+                    category_errors = self.checkstyle_errors[category]
+                    # For each selected category, randomly select 1-2 errors
+                    num_to_select = min(len(category_errors), random.randint(1, 2))
+                    if num_to_select > 0:
+                        selected_from_category = random.sample(category_errors, num_to_select)
+                        for error in selected_from_category:
+                            all_errors.append({
+                                "type": "checkstyle",
+                                "category": category,
+                                "name": error["check_name"],
+                                "description": error["description"],
+                                "implementation_guide": error.get("implementation_guide", "")
+                            })
+            
+            # If we have more errors than needed, randomly select the required number
+            if len(all_errors) > adjusted_count:
+                selected_errors = random.sample(all_errors, adjusted_count)
+            else:
+                selected_errors = all_errors
             
             # Format problem descriptions
             problem_descriptions = []
@@ -335,11 +384,6 @@ class JsonErrorRepository:
                 name = error.get("name", "Unknown")
                 description = error.get("description", "")
                 category = error.get("category", "")
-                
-                # Add implementation guide if available
-                implementation_guide = self._get_implementation_guide(error_type, name, category)
-                if implementation_guide:
-                    error["implementation_guide"] = implementation_guide
                 
                 if error_type == "build":
                     problem_descriptions.append(f"Build Error - {name}: {description} (Category: {category})")
