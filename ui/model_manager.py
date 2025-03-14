@@ -95,7 +95,7 @@ class ModelManagerUI:
                         <span class="model-name">{model_name}</span>
                         <span class="model-id">({model_id})</span>
                     </div>
-                    <div>
+                    <div><div>
                         <span class="model-badge {badge_class}">{status_text}</span>
                         {gpu_badge}
             </div>
