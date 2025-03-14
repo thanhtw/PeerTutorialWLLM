@@ -677,7 +677,7 @@ class LLMManager:
         
     def check_gpu_availability(self, extended: bool = False) -> Dict[str, Any]:
         """
-        Check if GPU is available for Ollama with enhanced details.
+        Check if GPU is available for Ollama with enhanced details and fallback detection.
         
         Args:
             extended: Whether to include extended GPU info
@@ -686,37 +686,100 @@ class LLMManager:
             Dict with GPU availability information
         """
         try:
-            # Check Ollama API for hardware information
-            response = requests.get(f"{self.ollama_base_url}/api/hardware", timeout=5)
+            # First try the hardware endpoint (newer Ollama versions)
+            try:
+                response = requests.get(f"{self.ollama_base_url}/api/hardware", timeout=5)
+                
+                if response.status_code == 200:
+                    hardware_info = response.json()
+                    gpu_info = hardware_info.get("gpu", {})
+                    
+                    # Check if GPU is available
+                    has_gpu = bool(gpu_info)
+                    
+                    # Format GPU information
+                    if has_gpu:
+                        gpu_name = gpu_info.get("name", "Unknown")
+                        gpu_memory = gpu_info.get("memory", {})
+                        memory_total = gpu_memory.get("total", "Unknown")
+                        memory_used = gpu_memory.get("used", "Unknown")
+                        
+                        result = {
+                            "has_gpu": True,
+                            "gpu_name": gpu_name,
+                            "memory_total": memory_total,
+                            "memory_used": memory_used,
+                            "memory_free": memory_total - memory_used if isinstance(memory_total, (int, float)) and isinstance(memory_used, (int, float)) else "Unknown",
+                            "formatted_total": self._format_size(memory_total) if isinstance(memory_total, (int, float)) else "Unknown",
+                            "formatted_used": self._format_size(memory_used) if isinstance(memory_used, (int, float)) else "Unknown",
+                            "message": f"GPU detected: {gpu_name} with {self._format_size(memory_total) if isinstance(memory_total, (int, float)) else 'Unknown'} memory"
+                        }
+                        
+                        # Add extended GPU info if requested
+                        if extended:
+                            # Try to get GPU utilization and temperature
+                            gpu_usage = self.get_gpu_memory_usage()
+                            result.update({
+                                "utilization": gpu_usage.get("utilization", 0),
+                                "memory_used_percent": gpu_usage.get("memory_used_percent", 0),
+                                "system_memory": self.get_system_memory_usage()
+                            })
+                        
+                        return result
+                    
+                    return {
+                        "has_gpu": False,
+                        "message": "No GPU detected for Ollama"
+                    }
+                
+                elif response.status_code == 404:
+                    # Hardware endpoint not available - try alternative detection methods
+                    logger.info("Ollama /api/hardware endpoint not found. Using alternative GPU detection.")
+                    return self._detect_gpu_alternative(extended)
+            except:
+                # API endpoint might not exist in this Ollama version
+                return self._detect_gpu_alternative(extended)
+                    
+            # If we reach here, fall back to alternative methods
+            return self._detect_gpu_alternative(extended)
+                
+        except Exception as e:
+            logger.error(f"Error checking GPU availability: {str(e)}")
+            return {
+                "has_gpu": False,
+                "message": f"Error checking GPU: {str(e)}"
+            }
+
+    def _detect_gpu_alternative(self, extended: bool = False) -> Dict[str, Any]:
+        """Alternative methods to detect GPU when the /api/hardware endpoint isn't available"""
+        # Method 1: Check for NVIDIA GPU using host command
+        try:
+            # Try to use nvidia-smi to check for GPU
+            result = subprocess.run(['nvidia-smi', '--query-gpu=name,memory.total,memory.used', '--format=csv,noheader,nounits'], 
+                                capture_output=True, text=True, check=False)
             
-            if response.status_code == 200:
-                hardware_info = response.json()
-                gpu_info = hardware_info.get("gpu", {})
-                
-                # Check if GPU is available
-                has_gpu = bool(gpu_info)
-                
-                # Format GPU information
-                if has_gpu:
-                    gpu_name = gpu_info.get("name", "Unknown")
-                    gpu_memory = gpu_info.get("memory", {})
-                    memory_total = gpu_memory.get("total", "Unknown")
-                    memory_used = gpu_memory.get("used", "Unknown")
+            if result.returncode == 0 and result.stdout.strip():
+                # Parse nvidia-smi output
+                gpu_data = result.stdout.strip().split(',')
+                if len(gpu_data) >= 3:
+                    gpu_name = gpu_data[0].strip()
+                    memory_total = float(gpu_data[1].strip()) * 1024 * 1024  # Convert to bytes
+                    memory_used = float(gpu_data[2].strip()) * 1024 * 1024  # Convert to bytes
                     
                     result = {
                         "has_gpu": True,
                         "gpu_name": gpu_name,
                         "memory_total": memory_total,
                         "memory_used": memory_used,
-                        "memory_free": memory_total - memory_used if isinstance(memory_total, (int, float)) and isinstance(memory_used, (int, float)) else "Unknown",
-                        "formatted_total": self._format_size(memory_total) if isinstance(memory_total, (int, float)) else "Unknown",
-                        "formatted_used": self._format_size(memory_used) if isinstance(memory_used, (int, float)) else "Unknown",
-                        "message": f"GPU detected: {gpu_name} with {self._format_size(memory_total) if isinstance(memory_total, (int, float)) else 'Unknown'} memory"
+                        "memory_free": memory_total - memory_used,
+                        "formatted_total": self._format_size(memory_total),
+                        "formatted_used": self._format_size(memory_used),
+                        "message": f"GPU detected: {gpu_name} with {self._format_size(memory_total)} memory",
+                        "detection_method": "nvidia-smi"
                     }
                     
                     # Add extended GPU info if requested
                     if extended:
-                        # Try to get GPU utilization and temperature
                         gpu_usage = self.get_gpu_memory_usage()
                         result.update({
                             "utilization": gpu_usage.get("utilization", 0),
@@ -725,30 +788,46 @@ class LLMManager:
                         })
                     
                     return result
-                else:
-                    result = {
-                        "has_gpu": False,
-                        "message": "No GPU detected for Ollama"
-                    }
-                    
-                    # Add system memory info if extended
-                    if extended:
-                        result["system_memory"] = self.get_system_memory_usage()
-                    
-                    return result
-            else:
+        except:
+            pass
+        
+        # Method 2: Generate with GPU flag and check response
+        try:
+            # Try a simple generate request with GPU flag to see if it works
+            response = requests.post(
+                f"{self.ollama_base_url}/api/generate",
+                json={"model": self.default_model, "prompt": "test", "options": {"num_gpu": 1}},
+                timeout=5
+            )
+            
+            if response.status_code == 200:
+                # If we get a successful response, GPU might be available
                 return {
-                    "has_gpu": False,
-                    "message": f"Failed to get hardware info: {response.status_code}"
+                    "has_gpu": True,
+                    "gpu_name": "GPU Detected",
+                    "message": "GPU appears to be working with Ollama",
+                    "detection_method": "generation-test"
                 }
-                
-        except Exception as e:
-            logger.error(f"Error checking GPU availability: {str(e)}")
+        except:
+            pass
+        
+        # Method 3: Check environment for GPU
+        if os.getenv("ENABLE_GPU", "false").lower() == "true" and self.force_gpu:
+            # User has explicitly configured GPU, so assume it's available even if we can't detect it
             return {
-                "has_gpu": False,
-                "message": f"Error checking GPU: {str(e)}"
+                "has_gpu": True,
+                "gpu_name": "GPU (Assumed from environment)",
+                "message": "GPU assumed available based on environment configuration",
+                "detection_method": "environment-config"
             }
         
+        # If all methods fail, assume no GPU
+        return {
+            "has_gpu": False,
+            "message": "No GPU detected for Ollama (after trying multiple detection methods)",
+            "system_memory": self.get_system_memory_usage() if extended else {}
+        }    
+    
     def enable_gpu_for_model(self, model_params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Enable GPU acceleration for model parameters with enhanced settings.
