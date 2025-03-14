@@ -108,7 +108,7 @@ def generate_code_problem(workflow: JavaCodeReviewGraph,
             
             state.code_length = code_length
             state.difficulty_level = difficulty_level
-            state.selected_error_categories = selected_error_categories
+            state._error_categories = selected_error_categories
             
             # Run the generation node with appropriate error selection
             status.update(label="Generating code with errors...", state="running")
@@ -353,7 +353,7 @@ def render_status_sidebar(llm_manager: LLMManager):
         
         # GPU details section
         st.markdown(
-            '<div class="gpu-info-section">'
+            f'<div class="gpu-info-section">'
             f'<div class="gpu-info-header">'
             f'<span>📊</span>'
             f'<div class="gpu-info-title">{gpu_name}</div>'

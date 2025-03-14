@@ -168,22 +168,7 @@ class ModelManagerUI:
                         <span class="gpu-info-label">Memory</span>
                         <span>{memory_used} / {memory_total}</span>
                     </div>
-                """
-                + (f"""
-                    <div class="gpu-info-detail">
-                        <span class="gpu-info-label">Memory Usage</span>
-                        <span>{memory_percent:.1f}%</span>
-                    </div>
-                """ if memory_percent else "")
-                + (f"""
-                    <div class="gpu-info-detail">
-                        <span class="gpu-info-label">Utilization</span>
-                        <span>{utilization:.1f}%</span>
-                    </div>
-                """ if utilization is not None else "")
-                + """
-                </div>
-                """,
+                """ ,
                 unsafe_allow_html=True
             )
         else:
@@ -468,8 +453,7 @@ class ModelManagerUI:
             st.markdown(f"""
             <div class="role-header">
                 <div>
-                    <span class="role-title"><span class="role-icon">{config["icon"]}</span>{config["title"]}</span>
-                    {('<span class="gpu-model-highlight">GPU</span>' if uses_gpu and gpu_available else '')}
+                    <span class="role-title"><span class="role-icon">{config["icon"]}</span>{config["title"]}</span>                    
                 </div>
             </div>
             <div class="role-description">{config["description"]}</div>
@@ -504,11 +488,7 @@ class ModelManagerUI:
             
             st.markdown(f"""
             <div class="selected-model">
-                <div>Selected: <strong style="color: var(--text);">{selected_model}</strong></div>
-                <div>
-                    <span class="model-badge">{model_size_badge}</span>
-                    {gpu_badge}
-                </div>
+                <div>Selected:<strong>{selected_model}</strong></div>                
             </div>
             """, unsafe_allow_html=True)
             
