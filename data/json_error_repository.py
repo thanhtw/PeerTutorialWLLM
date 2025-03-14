@@ -220,13 +220,13 @@ class JsonErrorRepository:
         return None
     
     def get_random_errors_by_categories(self, selected_categories: Dict[str, List[str]], 
-                                      count: int = 4) -> List[Dict[str, Any]]:
+                                  count: int = 4) -> List[Dict[str, Any]]:
         """
         Get random errors from selected categories.
         
         Args:
             selected_categories: Dictionary with 'build' and 'checkstyle' keys,
-                               each containing a list of selected categories
+                            each containing a list of selected categories
             count: Number of errors to select
             
         Returns:
@@ -244,7 +244,8 @@ class JsonErrorRepository:
                         "type": "build",
                         "category": category,
                         "name": error["error_name"],
-                        "description": error["description"]
+                        "description": error["description"],
+                        "implementation_guide": error.get("implementation_guide", "")
                     })
         
         # Checkstyle errors
@@ -255,7 +256,8 @@ class JsonErrorRepository:
                         "type": "checkstyle",
                         "category": category,
                         "name": error["check_name"],
-                        "description": error["description"]
+                        "description": error["description"],
+                        "implementation_guide": error.get("implementation_guide", "")
                     })
         
         # Select random errors
@@ -270,10 +272,10 @@ class JsonErrorRepository:
         return []
     
     def get_errors_for_llm(self, 
-                         selected_categories: Dict[str, List[str]] = None, 
-                         specific_errors: List[Dict[str, Any]] = None,
-                         count: int = 4, 
-                         difficulty: str = "medium") -> Tuple[List[Dict[str, Any]], List[str]]:
+                     selected_categories: Dict[str, List[str]] = None, 
+                     specific_errors: List[Dict[str, Any]] = None,
+                     count: int = 4, 
+                     difficulty: str = "medium") -> Tuple[List[Dict[str, Any]], List[str]]:
         """
         Get errors suitable for sending to the LLM for code generation.
         Can use either category-based selection or specific errors.
@@ -307,6 +309,11 @@ class JsonErrorRepository:
                 description = error.get("description", "")
                 category = error.get("category", "")
                 
+                # Add implementation guide if available
+                implementation_guide = self._get_implementation_guide(error_type, name, category)
+                if implementation_guide:
+                    error["implementation_guide"] = implementation_guide
+                
                 if error_type == "build":
                     problem_descriptions.append(f"Build Error - {name}: {description} (Category: {category})")
                 else:  # checkstyle
@@ -329,6 +336,11 @@ class JsonErrorRepository:
                 description = error.get("description", "")
                 category = error.get("category", "")
                 
+                # Add implementation guide if available
+                implementation_guide = self._get_implementation_guide(error_type, name, category)
+                if implementation_guide:
+                    error["implementation_guide"] = implementation_guide
+                
                 if error_type == "build":
                     problem_descriptions.append(f"Build Error - {name}: {description} (Category: {category})")
                 else:  # checkstyle
@@ -339,6 +351,30 @@ class JsonErrorRepository:
         # If no selection method was provided, return empty lists
         return [], []
     
+    def _get_implementation_guide(self, error_type: str, error_name: str, category: str) -> Optional[str]:
+        """
+        Get implementation guide for a specific error.
+        
+        Args:
+            error_type: Type of error ('build' or 'checkstyle')
+            error_name: Name of the error
+            category: Category of the error
+            
+        Returns:
+            Implementation guide string or None if not found
+        """
+        if error_type == "build":
+            if category in self.build_errors:
+                for error in self.build_errors[category]:
+                    if error.get("error_name") == error_name:
+                        return error.get("implementation_guide")
+        elif error_type == "checkstyle":
+            if category in self.checkstyle_errors:
+                for error in self.checkstyle_errors[category]:
+                    if error.get("check_name") == error_name:
+                        return error.get("implementation_guide")
+        return None
+
     def search_errors(self, search_term: str) -> List[Dict[str, Any]]:
         """
         Search for errors containing the search term.

@@ -350,55 +350,19 @@ class AgentService:
             "long": "2-3 classes with 5-10 methods and proper class relationships"
         }.get(code_length_str.lower(), "1 class with 4-6 methods")
         
-        # Create error instructions
+        # Create error instructions using implementation guides directly from JSON
         error_instructions = ""
         for i, error in enumerate(selected_errors, 1):
             error_type = error["type"]
             category = error["category"]
             name = error["name"]
             description = error["description"]
+            implementation_guide = error.get("implementation_guide", "Create this error in a way that matches its description")
             
             error_instructions += f"{i}. {error_type.upper()} ERROR - {name}\n"
             error_instructions += f"   Category: {category}\n"
             error_instructions += f"   Description: {description}\n"
-            
-            # Add specific implementation suggestion based on error type and name
-            if error_type == "build":
-                if "Cannot find symbol" in name:
-                    error_instructions += f"   Suggestion: Use a variable, method, or class that hasn't been defined or imported\n"
-                elif "NullPointer" in name:
-                    error_instructions += f"   Suggestion: Create a scenario where a null object is accessed without proper null check\n"
-                elif "Incompatible types" in name or "Type mismatch" in name:
-                    error_instructions += f"   Suggestion: Assign a value to a variable of an incompatible type\n"
-                elif "Missing return" in name:
-                    error_instructions += f"   Suggestion: Remove the return statement from a non-void method\n"
-                elif "Unreported exception" in name:
-                    error_instructions += f"   Suggestion: Throw a checked exception without a try-catch or throws declaration\n"
-                elif "Class not found" in name or "Package does not exist" in name:
-                    error_instructions += f"   Suggestion: Import a non-existent class or package\n"
-                elif "ArrayIndexOutOfBounds" in name or "IndexOutOfBounds" in name:
-                    error_instructions += f"   Suggestion: Access an array or list with an invalid index\n"
-                else:
-                    error_instructions += f"   Suggestion: Implement this error in a way that matches its description\n"
-            else:  # checkstyle
-                if "Naming" in name or "Name" in name:
-                    error_instructions += f"   Suggestion: Use inappropriate naming convention for a class, method, or variable\n"
-                elif "Whitespace" in name or "Indentation" in name:
-                    error_instructions += f"   Suggestion: Use inconsistent or incorrect whitespace/indentation\n"
-                elif "Javadoc" in name or "Comment" in name:
-                    error_instructions += f"   Suggestion: Create missing or improperly formatted Javadoc/comments\n"
-                elif "Braces" in name or "Curly" in name or "LeftCurly" in name or "RightCurly" in name:
-                    error_instructions += f"   Suggestion: Place curly braces inconsistently or incorrectly\n"
-                elif "Import" in name:
-                    error_instructions += f"   Suggestion: Create import-related issues like unused imports or star imports\n"
-                elif "Empty" in name:
-                    error_instructions += f"   Suggestion: Create an empty block or statement without proper comments\n"
-                elif "Magic" in name:
-                    error_instructions += f"   Suggestion: Use magic numbers instead of named constants\n"
-                else:
-                    error_instructions += f"   Suggestion: Implement this style violation naturally\n"
-                    
-            error_instructions += "\n"
+            error_instructions += f"   Implementation: {implementation_guide}\n\n"
 
         # Check if reasoning mode is enabled
         reasoning_mode = os.getenv("REASONING_MODE", "false").lower() == "true"
@@ -424,9 +388,10 @@ class AgentService:
     3. For each error you include:
     - Make sure it exactly matches the description provided
     - Place it at a logical location in the code
-    - Ensure it's recognizable to a student with beginner to intermediate Java knowledge
-    - Add brief comments nearby (using // Comment format) that hint at the error without directly stating it
+    - IMPORTANT: Add a comment with "ERROR TYPE: ERROR NAME" (e.g. "// BUILD ERROR: Missing return statement") directly above the line containing the error
+    - Add brief details in the comment about what the error is and why it's problematic
     4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
+    5. Return your final code in a code block with ``` delimiters
 
     I'll now create the Java code with the required errors:
     """
@@ -445,13 +410,14 @@ class AgentService:
     3. For each error you include:
     - Make sure it exactly matches the description provided
     - Place it at a logical location in the code
-    - Ensure it's recognizable to a student with beginner to intermediate Java knowledge
-    - Add brief comments nearby (using // Comment format) that hint at the error without directly stating it
+    - IMPORTANT: Add a comment with "ERROR TYPE: ERROR NAME" (e.g. "// BUILD ERROR: Missing return statement") directly above the line containing the error
+    - Add brief details in the comment about what the error is and why it's problematic
     4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
+    5. Return your final code in a code block with ``` delimiters
 
     Return ONLY the Java code with the errors included. Do not include any explanations or JSON formatting.
     """
-            
+                
         return prompt
     
     def _extract_code_from_response(self, response: str) -> str:

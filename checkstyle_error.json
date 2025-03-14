@@ -2,375 +2,464 @@
     "NamingConventionChecks": [
         {
             "check_name": "TypeName",
-            "description": "Checks that type names (classes, interfaces, enums) follow convention: should be UpperCamelCase."
+            "description": "Checks that type names (classes, interfaces, enums) follow convention: should be UpperCamelCase.",
+            "implementation_guide": "Create a class, interface, or enum with a name that doesn't use UpperCamelCase (e.g., using lowercase for first letter)"
         },
         {
             "check_name": "MemberName",
-            "description": "Checks that instance variable names follow convention: should be lowerCamelCase."
+            "description": "Checks that instance variable names follow convention: should be lowerCamelCase.",
+            "implementation_guide": "Declare instance variables that don't follow lowerCamelCase (e.g., starting with uppercase or using underscores)"
         },
         {
             "check_name": "MethodName",
-            "description": "Checks that method names follow convention: should be lowerCamelCase."
+            "description": "Checks that method names follow convention: should be lowerCamelCase.",
+            "implementation_guide": "Create methods with names that don't follow lowerCamelCase convention"
         },
         {
             "check_name": "ParameterName",
-            "description": "Checks that parameter names follow convention: should be lowerCamelCase."
+            "description": "Checks that parameter names follow convention: should be lowerCamelCase.",
+            "implementation_guide": "Use method parameters with names that don't follow lowerCamelCase convention"
         },
         {
             "check_name": "ConstantName",
-            "description": "Checks that constant names follow convention: should be UPPER_CASE."
+            "description": "Checks that constant names follow convention: should be UPPER_CASE.",
+            "implementation_guide": "Define constants (static final fields) that aren't in UPPER_CASE format"
         },
         {
             "check_name": "LocalVariableName",
-            "description": "Checks that local variable names follow convention: should be lowerCamelCase."
+            "description": "Checks that local variable names follow convention: should be lowerCamelCase.",
+            "implementation_guide": "Declare local variables with names that don't follow lowerCamelCase convention"
         },
         {
             "check_name": "StaticVariableName",
-            "description": "Checks that static, non-final variable names follow convention: should be lowerCamelCase."
+            "description": "Checks that static, non-final variable names follow convention: should be lowerCamelCase.",
+            "implementation_guide": "Create static variables with names that violate lowerCamelCase convention"
         },
         {
             "check_name": "PackageName",
-            "description": "Checks that package names follow convention: should be all lowercase with no underscores."
+            "description": "Checks that package names follow convention: should be all lowercase with no underscores.",
+            "implementation_guide": "Define a package name with uppercase letters or underscores"
         },
         {
             "check_name": "InterfaceName",
-            "description": "Checks that interface names follow convention: should be UpperCamelCase, can optionally begin with 'I'."
+            "description": "Checks that interface names follow convention: should be UpperCamelCase, can optionally begin with 'I'.",
+            "implementation_guide": "Create an interface with a name that doesn't follow UpperCamelCase convention"
         },
         {
             "check_name": "ClassTypeParameterName",
-            "description": "Checks that class type parameter names follow convention: should be a single uppercase letter or UpperCamelCase ending with 'T'."
+            "description": "Checks that class type parameter names follow convention: should be a single uppercase letter or UpperCamelCase ending with 'T'.",
+            "implementation_guide": "Use generic type parameters that don't follow the convention (not single uppercase or not ending with 'T')"
         },
         {
             "check_name": "MethodTypeParameterName",
-            "description": "Checks that method type parameter names follow convention: should be a single uppercase letter or UpperCamelCase ending with 'T'."
+            "description": "Checks that method type parameter names follow convention: should be a single uppercase letter or UpperCamelCase ending with 'T'.",
+            "implementation_guide": "Define method type parameters that violate the naming convention"
         },
         {
             "check_name": "InterfaceTypeParameterName",
-            "description": "Checks that interface type parameter names follow convention: should be a single uppercase letter or UpperCamelCase ending with 'T'."
+            "description": "Checks that interface type parameter names follow convention: should be a single uppercase letter or UpperCamelCase ending with 'T'.",
+            "implementation_guide": "Use interface type parameters that don't follow the naming convention"
         }
     ],
     "WhitespaceAndFormattingChecks": [
         {
             "check_name": "WhitespaceAround",
-            "description": "Checks that tokens like '=', '+', '{', '}' are padded with whitespace."
+            "description": "Checks that tokens like '=', '+', '{', '}' are padded with whitespace.",
+            "implementation_guide": "Remove spaces around operators and braces (e.g., 'int x=5+2;' instead of 'int x = 5 + 2;')"
         },
         {
             "check_name": "WhitespaceAfter",
-            "description": "Checks that commas, semicolons, and typecasts are followed by whitespace."
+            "description": "Checks that commas, semicolons, and typecasts are followed by whitespace.",
+            "implementation_guide": "Omit spaces after commas, semicolons, or typecasts"
         },
         {
             "check_name": "NoWhitespaceAfter",
-            "description": "Checks that there is no whitespace after tokens like unary operators or array index brackets."
+            "description": "Checks that there is no whitespace after tokens like unary operators or array index brackets.",
+            "implementation_guide": "Add incorrect whitespace after unary operators or opening brackets"
         },
         {
             "check_name": "NoWhitespaceBefore",
-            "description": "Checks that there is no whitespace before tokens like commas, semicolons, and postfix operators."
+            "description": "Checks that there is no whitespace before tokens like commas, semicolons, and postfix operators.",
+            "implementation_guide": "Add incorrect whitespace before commas, semicolons, or postfix operators"
         },
         {
             "check_name": "GenericWhitespace",
-            "description": "Checks that generic tokens like '<' and '>' have correct whitespace."
+            "description": "Checks that generic tokens like '<' and '>' have correct whitespace.",
+            "implementation_guide": "Use incorrect spacing around generic type parameters (e.g., 'List < String >')"
         },
         {
             "check_name": "MethodParamPad",
-            "description": "Checks that the method parameter list has no whitespace before or after the parentheses."
+            "description": "Checks that the method parameter list has no whitespace before or after the parentheses.",
+            "implementation_guide": "Add whitespace between method name and opening parenthesis (e.g., 'method (param)' instead of 'method(param)')"
         },
         {
             "check_name": "EmptyForIteratorPad",
-            "description": "Checks padding of an empty for iterator; no padding should be used."
+            "description": "Checks padding of an empty for iterator; no padding should be used.",
+            "implementation_guide": "Add unnecessary whitespace in empty for loop components (e.g., 'for ( ; ; )')"
         },
         {
             "check_name": "ParenPad",
-            "description": "Checks padding of parentheses; no padding should be used."
+            "description": "Checks padding of parentheses; no padding should be used.",
+            "implementation_guide": "Add whitespace inside parentheses (e.g., '( x + y )' instead of '(x + y)')"
         },
         {
             "check_name": "TypecastParenPad",
-            "description": "Checks padding of parentheses for typecasts; no padding should be used."
+            "description": "Checks padding of parentheses for typecasts; no padding should be used.",
+            "implementation_guide": "Add whitespace inside typecast parentheses (e.g., '( int ) x' instead of '(int)x')"
         },
         {
             "check_name": "FileTabCharacter",
-            "description": "Checks that no tab characters are used in the source code, only spaces."
+            "description": "Checks that no tab characters are used in the source code, only spaces.",
+            "implementation_guide": "Use tab characters for indentation instead of spaces"
         },
         {
             "check_name": "LineLength",
-            "description": "Checks that line length is not greater than 80 characters."
+            "description": "Checks that line length is not greater than 80 characters.",
+            "implementation_guide": "Create a line that exceeds 80 characters in length"
         },
         {
             "check_name": "EmptyLineSeparator",
-            "description": "Checks for empty line separators between header, package, import, class, method, and other blocks."
+            "description": "Checks for empty line separators between header, package, import, class, method, and other blocks.",
+            "implementation_guide": "Remove required blank lines between class/method definitions or package/import statements"
         },
         {
             "check_name": "SeparatorWrap",
-            "description": "Checks line wrapping with separators like '.', ',', etc."
+            "description": "Checks line wrapping with separators like '.', ',', etc.",
+            "implementation_guide": "Place line-breaking separators incorrectly (e.g., starting a line with a dot in method chaining)"
         },
         {
             "check_name": "OperatorWrap",
-            "description": "Checks line wrapping with operators - should be at the end of the line in Sun style."
+            "description": "Checks line wrapping with operators - should be at the end of the line in Sun style.",
+            "implementation_guide": "Place operators at the beginning of a new line instead of the end of the previous line"
         }
     ],
     "BlockChecks": [
         {
             "check_name": "LeftCurly",
-            "description": "Checks placement of left curly braces ('{'); should be at the end of the line."
+            "description": "Checks placement of left curly braces ('{'); should be at the end of the line.",
+            "implementation_guide": "Place opening curly braces on a new line instead of at the end of the previous line"
         },
         {
             "check_name": "RightCurly",
-            "description": "Checks placement of right curly braces ('}'); should be alone on a line."
+            "description": "Checks placement of right curly braces ('}'); should be alone on a line.",
+            "implementation_guide": "Place closing curly braces on the same line as the next statement instead of on their own line"
         },
         {
             "check_name": "NeedBraces",
-            "description": "Checks for braces around code blocks like 'if', 'for', 'while', 'do-while' statements."
+            "description": "Checks for braces around code blocks like 'if', 'for', 'while', 'do-while' statements.",
+            "implementation_guide": "Omit braces around single-statement code blocks in if/for/while statements"
         },
         {
             "check_name": "EmptyBlock",
-            "description": "Checks for empty blocks. Empty blocks should have a comment inside."
+            "description": "Checks for empty blocks. Empty blocks should have a comment inside.",
+            "implementation_guide": "Create an empty block (e.g., catch block) without a comment explaining why it's empty"
         },
         {
             "check_name": "AvoidNestedBlocks",
-            "description": "Checks for nested blocks that could be removed."
+            "description": "Checks for nested blocks that could be removed.",
+            "implementation_guide": "Create unnecessary nested blocks within method bodies"
         },
         {
             "check_name": "OneStatementPerLine",
-            "description": "Checks that there is only one statement per line."
+            "description": "Checks that there is only one statement per line.",
+            "implementation_guide": "Put multiple statements on a single line separated by semicolons"
         }
     ],
     "ImportChecks": [
         {
             "check_name": "AvoidStarImport",
-            "description": "Checks that there are no import statements using the '.*' notation."
+            "description": "Checks that there are no import statements using the '.*' notation.",
+            "implementation_guide": "Use wildcard imports (e.g., 'import java.util.*' instead of specific imports)"
         },
         {
             "check_name": "RedundantImport",
-            "description": "Checks for redundant import statements (duplicated or from java.lang)."
+            "description": "Checks for redundant import statements (duplicated or from java.lang).",
+            "implementation_guide": "Import the same class multiple times or explicitly import classes from java.lang"
         },
         {
             "check_name": "UnusedImports",
-            "description": "Checks for unused import statements."
+            "description": "Checks for unused import statements.",
+            "implementation_guide": "Import classes that aren't used in the code"
         },
         {
             "check_name": "IllegalImport",
-            "description": "Checks for imports from illegal packages (e.g., sun.*)."
+            "description": "Checks for imports from illegal packages (e.g., sun.*).",
+            "implementation_guide": "Import classes from sun.* or other internal/implementation packages"
         },
         {
             "check_name": "ImportOrder",
-            "description": "Checks the ordering and separation of import statements."
+            "description": "Checks the ordering and separation of import statements.",
+            "implementation_guide": "Place import statements in incorrect order (e.g., static imports after regular imports)"
         },
         {
             "check_name": "CustomImportOrder",
-            "description": "Checks that import statements are ordered according to a customizable format."
+            "description": "Checks that import statements are ordered according to a customizable format.",
+            "implementation_guide": "Mix different types of imports in incorrect order"
         }
     ],
     "JavadocChecks": [
         {
             "check_name": "JavadocType",
-            "description": "Checks for Javadoc comments for class, interface, and enum definitions."
+            "description": "Checks for Javadoc comments for class, interface, and enum definitions.",
+            "implementation_guide": "Create a class, interface, or enum without a proper Javadoc comment"
         },
         {
             "check_name": "JavadocMethod",
-            "description": "Checks for Javadoc comments for methods and constructors."
+            "description": "Checks for Javadoc comments for methods and constructors.",
+            "implementation_guide": "Create methods without Javadoc comments or with incomplete parameter/return documentation"
         },
         {
             "check_name": "JavadocVariable",
-            "description": "Checks for Javadoc comments for class variables and instance variables."
+            "description": "Checks for Javadoc comments for class variables and instance variables.",
+            "implementation_guide": "Define class or instance variables without Javadoc comments"
         },
         {
             "check_name": "JavadocStyle",
-            "description": "Checks that Javadoc comments are properly formatted with correct punctuation and descriptions."
+            "description": "Checks that Javadoc comments are properly formatted with correct punctuation and descriptions.",
+            "implementation_guide": "Create Javadoc comments with incorrect formatting or missing punctuation"
         },
         {
             "check_name": "NonEmptyAtclauseDescription",
-            "description": "Checks that Javadoc @clauses (e.g., @param, @return) have non-empty descriptions."
+            "description": "Checks that Javadoc @clauses (e.g., @param, @return) have non-empty descriptions.",
+            "implementation_guide": "Add Javadoc tags (@param, @return) without descriptions"
         },
         {
             "check_name": "SummaryJavadoc",
-            "description": "Checks that Javadoc summary sentences are on a single line."
+            "description": "Checks that Javadoc summary sentences are on a single line.",
+            "implementation_guide": "Split Javadoc summary sentences across multiple lines"
         },
         {
             "check_name": "JavadocTagContinuationIndentation",
-            "description": "Checks the indentation of Javadoc continuation lines."
+            "description": "Checks the indentation of Javadoc continuation lines.",
+            "implementation_guide": "Use incorrect indentation for multi-line Javadoc tag descriptions"
         },
         {
             "check_name": "AtclauseOrder",
-            "description": "Checks the order of Javadoc @clauses."
+            "description": "Checks the order of Javadoc @clauses.",
+            "implementation_guide": "Place Javadoc tags in incorrect order (e.g., @return before @param)"
         },
         {
             "check_name": "SingleLineJavadoc",
-            "description": "Checks that single-line Javadoc comments are properly formatted."
+            "description": "Checks that single-line Javadoc comments are properly formatted.",
+            "implementation_guide": "Create a single-line Javadoc that should be multi-line or is missing required elements"
         }
     ],
     "MetricsChecks": [
         {
             "check_name": "CyclomaticComplexity",
-            "description": "Checks cyclomatic complexity against a specified limit."
+            "description": "Checks cyclomatic complexity against a specified limit.",
+            "implementation_guide": "Create a method with excessive complexity using many nested if/else statements or switch cases"
         },
         {
             "check_name": "BooleanExpressionComplexity",
-            "description": "Checks if boolean expressions are too complex based on number of operations."
+            "description": "Checks if boolean expressions are too complex based on number of operations.",
+            "implementation_guide": "Write a boolean expression with too many operators (&& || ! etc.)"
         },
         {
             "check_name": "ClassDataAbstractionCoupling",
-            "description": "Checks the number of instantiations of other classes within a given class."
+            "description": "Checks the number of instantiations of other classes within a given class.",
+            "implementation_guide": "Create a class that instantiates too many different types of objects"
         },
         {
             "check_name": "ClassFanOutComplexity",
-            "description": "Checks the number of other classes a given class relies on."
+            "description": "Checks the number of other classes a given class relies on.",
+            "implementation_guide": "Make a class depend on too many other classes"
         },
         {
             "check_name": "NPathComplexity",
-            "description": "Checks the NPath complexity against a specified limit."
+            "description": "Checks the NPath complexity against a specified limit.",
+            "implementation_guide": "Create a method with too many possible execution paths"
         },
         {
             "check_name": "JavaNCSS",
-            "description": "Checks the Non-Commenting Source Statements (NCSS) metric, which roughly corresponds to LLOC."
+            "description": "Checks the Non-Commenting Source Statements (NCSS) metric, which roughly corresponds to LLOC.",
+            "implementation_guide": "Write methods, classes, or files that have too many non-comment source statements"
         },
         {
             "check_name": "ExecutableStatementCount",
-            "description": "Checks the number of executable statements in methods, constructors, and initializers."
+            "description": "Checks the number of executable statements in methods, constructors, and initializers.",
+            "implementation_guide": "Create a method with an excessive number of executable statements"
         },
         {
             "check_name": "MethodCount",
-            "description": "Checks the number of methods declared in each type."
+            "description": "Checks the number of methods declared in each type.",
+            "implementation_guide": "Define a class with an excessive number of methods"
         },
         {
             "check_name": "MethodLength",
-            "description": "Checks the number of lines in a method to ensure it's not too long."
+            "description": "Checks the number of lines in a method to ensure it's not too long.",
+            "implementation_guide": "Create a method that's too long (excessive number of lines)"
         }
     ],
     "MiscellaneousChecks": [
         {
             "check_name": "ArrayTypeStyle",
-            "description": "Checks that array brackets are placed with the type, not the variable (e.g., String[] names, not String names[])."
+            "description": "Checks that array brackets are placed with the type, not the variable (e.g., String[] names, not String names[]).",
+            "implementation_guide": "Declare arrays with brackets after the variable name instead of after the type"
         },
         {
             "check_name": "FinalParameters",
-            "description": "Checks that method parameters are final."
+            "description": "Checks that method parameters are final.",
+            "implementation_guide": "Define method parameters without the 'final' keyword"
         },
         {
             "check_name": "TodoComment",
-            "description": "Checks for TODO comments, which should be addressed before completion."
+            "description": "Checks for TODO comments, which should be addressed before completion.",
+            "implementation_guide": "Leave TODO comments in the code"
         },
         {
             "check_name": "UpperEll",
-            "description": "Checks that long literals use uppercase 'L' (e.g., 10000000L, not 10000000l)."
+            "description": "Checks that long literals use uppercase 'L' (e.g., 10000000L, not 10000000l).",
+            "implementation_guide": "Use lowercase 'l' instead of uppercase 'L' for long literals"
         },
         {
             "check_name": "ModifierOrder",
-            "description": "Checks that modifier keywords are in the correct order (e.g., public static final, not final static public)."
+            "description": "Checks that modifier keywords are in the correct order (e.g., public static final, not final static public).",
+            "implementation_guide": "Place modifiers in incorrect order (e.g., 'static public void' instead of 'public static void')"
         },
         {
             "check_name": "RedundantModifier",
-            "description": "Checks for redundant modifiers (e.g., public method in interface)."
+            "description": "Checks for redundant modifiers (e.g., public method in interface).",
+            "implementation_guide": "Use redundant modifiers like 'public' for interface methods or 'static' for interface fields"
         },
         {
             "check_name": "FinalClass",
-            "description": "Checks that a class with private constructors is declared as final."
+            "description": "Checks that a class with private constructors is declared as final.",
+            "implementation_guide": "Create a class with only private constructors but without making it final"
         },
         {
             "check_name": "HideUtilityClassConstructor",
-            "description": "Checks that utility classes (classes with only static methods) have a private constructor."
+            "description": "Checks that utility classes (classes with only static methods) have a private constructor.",
+            "implementation_guide": "Create a utility class (with only static methods) without a private constructor"
         },
         {
             "check_name": "DesignForExtension",
-            "description": "Checks that methods designed for extension are properly documented and marked with @Override."
+            "description": "Checks that methods designed for extension are properly documented and marked with @Override.",
+            "implementation_guide": "Create non-final public methods without documentation for extension"
         },
         {
             "check_name": "MutableException",
-            "description": "Checks that exception classes are immutable (all fields are final)."
+            "description": "Checks that exception classes are immutable (all fields are final).",
+            "implementation_guide": "Create an exception class with non-final fields"
         },
         {
             "check_name": "InterfaceIsType",
-            "description": "Checks that interfaces define types and are not just used to group constants."
+            "description": "Checks that interfaces define types and are not just used to group constants.",
+            "implementation_guide": "Create an interface that only contains constants without any methods"
         },
         {
             "check_name": "VisibilityModifier",
-            "description": "Checks visibility of class members, enforcing encapsulation principles."
+            "description": "Checks visibility of class members, enforcing encapsulation principles.",
+            "implementation_guide": "Create a class with public fields instead of using proper encapsulation"
         }
     ],
     "CodeQualityChecks": [
         {
             "check_name": "FallThrough",
-            "description": "Checks for fall-through in switch statements where one case flows into the next."
+            "description": "Checks for fall-through in switch statements where one case flows into the next.",
+            "implementation_guide": "Create a switch statement where cases fall through without a break statement or comment"
         },
         {
             "check_name": "MissingSwitchDefault",
-            "description": "Checks that switch statements have a default case."
+            "description": "Checks that switch statements have a default case.",
+            "implementation_guide": "Write a switch statement without a default case"
         },
         {
             "check_name": "MultipleVariableDeclarations",
-            "description": "Checks that each variable declaration is in its own statement and line."
+            "description": "Checks that each variable declaration is in its own statement and line.",
+            "implementation_guide": "Declare multiple variables in the same statement (e.g., 'int x, y, z;')"
         },
         {
             "check_name": "EmptyStatement",
-            "description": "Checks for empty statements (standalone semicolons)."
+            "description": "Checks for empty statements (standalone semicolons).",
+            "implementation_guide": "Include unnecessary semicolons creating empty statements (e.g., 'if(condition);;')"
         },
         {
             "check_name": "SimplifyBooleanExpression",
-            "description": "Checks for boolean expressions that can be simplified."
+            "description": "Checks for boolean expressions that can be simplified.",
+            "implementation_guide": "Write overly complex boolean expressions that could be simplified"
         },
         {
             "check_name": "SimplifyBooleanReturn",
-            "description": "Checks for return statements like 'if (x) return true; else return false;' that can be simplified."
+            "description": "Checks for return statements like 'if (x) return true; else return false;' that can be simplified.",
+            "implementation_guide": "Use conditional returns that could be simplified (e.g., 'if(x) return true; else return false;')"
         },
         {
             "check_name": "StringLiteralEquality",
-            "description": "Checks that string literals are not compared using '==' or '!='."
+            "description": "Checks that string literals are not compared using '==' or '!='.",
+            "implementation_guide": "Compare string literals using == or != instead of equals() method"
         },
         {
             "check_name": "EqualsHashCode",
-            "description": "Checks that classes overriding equals() also override hashCode()."
+            "description": "Checks that classes overriding equals() also override hashCode().",
+            "implementation_guide": "Override equals() method without also overriding hashCode()"
         },
         {
             "check_name": "InnerAssignment",
-            "description": "Checks for assignments within expressions or within the condition of statements."
+            "description": "Checks for assignments within expressions or within the condition of statements.",
+            "implementation_guide": "Include assignments inside expressions (e.g., 'if ((x = y) > 0)')"
         },
         {
             "check_name": "MagicNumber",
-            "description": "Checks for magic numbers (non-zero numeric literals) that should be named constants."
+            "description": "Checks for magic numbers (non-zero numeric literals) that should be named constants.",
+            "implementation_guide": "Use magic numbers instead of named constants"
         },
         {
             "check_name": "IllegalCatch",
-            "description": "Checks that certain exception types are not caught (e.g., RuntimeException, Exception)."
+            "description": "Checks that certain exception types are not caught (e.g., RuntimeException, Exception).",
+            "implementation_guide": "Catch overly generic exceptions like Exception or RuntimeException"
         },
         {
             "check_name": "IllegalThrows",
-            "description": "Checks that methods do not declare throws for generic exception types."
+            "description": "Checks that methods do not declare throws for generic exception types.",
+            "implementation_guide": "Declare methods that throw overly generic exceptions like Exception"
         },
         {
             "check_name": "ReturnCount",
-            "description": "Checks that the number of return statements in methods is not excessive."
+            "description": "Checks that the number of return statements in methods is not excessive.",
+            "implementation_guide": "Write a method with too many return statements"
         },
         {
             "check_name": "NestedIfDepth",
-            "description": "Checks that if-statements are not nested too deeply."
+            "description": "Checks that if-statements are not nested too deeply.",
+            "implementation_guide": "Create deeply nested if statements"
         },
         {
             "check_name": "NestedTryDepth",
-            "description": "Checks that try-statements are not nested too deeply."
+            "description": "Checks that try-statements are not nested too deeply.",
+            "implementation_guide": "Create deeply nested try blocks"
         }
     ],
     "FileStructureChecks": [
         {
             "check_name": "OuterTypeFilename",
-            "description": "Checks that the outer type name and the file name match."
+            "description": "Checks that the outer type name and the file name match.",
+            "implementation_guide": "Name a class differently from its file name"
         },
         {
             "check_name": "OuterTypeNumber",
-            "description": "Checks that each file has only one top-level class or interface."
+            "description": "Checks that each file has only one top-level class or interface.",
+            "implementation_guide": "Define multiple public classes or interfaces in a single file"
         },
         {
             "check_name": "NewlineAtEndOfFile",
-            "description": "Checks that files end with a newline character."
+            "description": "Checks that files end with a newline character.",
+            "implementation_guide": "Omit the newline character at the end of the file"
         },
         {
             "check_name": "RegexpHeader",
-            "description": "Checks that file headers match a specified regular expression pattern."
+            "description": "Checks that file headers match a specified regular expression pattern.",
+            "implementation_guide": "Create a file without the required header comment pattern"
         },
         {
             "check_name": "FileLength",
-            "description": "Checks that files are not too long (typically 2000 lines max)."
+            "description": "Checks that files are not too long (typically 2000 lines max).",
+            "implementation_guide": "Create a file that exceeds the maximum recommended length"
         },
         {
             "check_name": "UniqueProperties",
-            "description": "Checks that properties files do not contain duplicate keys."
+            "description": "Checks that properties files do not contain duplicate keys.",
+            "implementation_guide": "Include duplicate keys in a properties file"
         }
     ]
 }
