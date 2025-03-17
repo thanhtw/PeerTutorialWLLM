@@ -8,6 +8,7 @@ and handling student review input.
 import streamlit as st
 import logging
 from typing import List, Dict, Any, Optional, Tuple, Callable
+from utils.code_utils import add_line_numbers
 
 # Configure logging
 logging.basicConfig(
@@ -63,27 +64,8 @@ class CodeDisplayUI:
                     st.markdown(f"{i}. {problem}")
     
     def _add_line_numbers(self, code: str) -> str:
-        """
-        Add line numbers to code snippet.
-        
-        Args:
-            code: The code snippet to add line numbers to
-            
-        Returns:
-            Code with line numbers
-        """
-        lines = code.splitlines()
-        max_line_num = len(lines)
-        padding = len(str(max_line_num))
-        
-        # Create a list of lines with line numbers
-        numbered_lines = []
-        for i, line in enumerate(lines, 1):
-            # Format line number with consistent padding
-            line_num = str(i).rjust(padding)
-            numbered_lines.append(f"{line_num} | {line}")
-        
-        return "\n".join(numbered_lines)
+        """Add line numbers to code snippet using shared utility."""
+        return add_line_numbers(code)
     
     def render_review_input(self, student_review: str = "", 
                       on_submit_callback: Callable[[str], None] = None,

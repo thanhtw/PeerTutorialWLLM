@@ -10,6 +10,7 @@ import random
 import logging
 from typing import Dict, Any, List, Optional, Tuple
 from langchain_core.language_models import BaseLanguageModel
+from utils.code_utils import create_code_generation_prompt, extract_code_from_response
 
 # Configure logging
 logging.basicConfig(
@@ -96,13 +97,18 @@ class CodeGenerator:
         Returns:
             Generated Java code as a string
         """
-    
         # Select a domain if not provided
         if not domain:
             domain = random.choice(self.domains)
         
-        # Create a detailed prompt for the LLM
-        prompt = self._create_generation_prompt(code_length, difficulty_level, domain)
+        # Create a detailed prompt for the LLM using shared utility
+        prompt = create_code_generation_prompt(
+            code_length=code_length,
+            difficulty_level=difficulty_level,
+            selected_errors=[],  # No errors for clean code
+            domain=domain,
+            include_error_annotations=False
+        )
         
         try:
             # Generate the code using the LLM
@@ -110,7 +116,7 @@ class CodeGenerator:
             response = self.llm.invoke(prompt)
             
             # Extract the Java code from the response
-            code = self._extract_code_from_response(response)
+            code = extract_code_from_response(response)
             
             # Return the generated code
             return code
@@ -127,62 +133,4 @@ class CodeGenerator:
     }
     """
            
-    def _extract_code_from_response(self, response: str) -> str:
-        """
-        Extract Java code from LLM response.
-        
-        Args:
-            response: Full response from the LLM
-            
-        Returns:
-            Extracted Java code
-        """
-        # Try to extract code blocks
-        import re
-        code_blocks = re.findall(r'```(?:java)?\s*(.*?)\s*```', response, re.DOTALL)
-        
-        if code_blocks:
-            # Return the largest code block
-            return max(code_blocks, key=len)
-        
-        return response  # If no code blocks found, return the full response
     
-    def _create_generation_prompt(self, code_length: str, difficulty_level: str, domain: str) -> str:
-        """
-        Create a detailed prompt for the LLM to generate Java code.
-        
-        Args:
-            code_length: Desired code length (short, medium, long)
-            difficulty_level: Difficulty level (easy, medium, hard)
-            domain: Domain for the code context
-            
-        Returns:
-            Formatted prompt
-        """
-        complexity_profile = self.complexity_profiles.get(code_length, self.complexity_profiles["medium"])
-        
-        prompt = f"""
-You are a Java programming expert. Create a realistic, working Java code snippet for a {domain} system.
-
-The code should be {code_length} in length and {difficulty_level} in complexity.
-
-Requirements:
-- Create approximately {complexity_profile["class_count"]} main class(es)
-- Include {complexity_profile["method_count_range"][0]}-{complexity_profile["method_count_range"][1]} methods
-- Define {complexity_profile["field_count_range"][0]}-{complexity_profile["field_count_range"][1]} fields/properties
-- Use {complexity_profile["imports_count_range"][0]}-{complexity_profile["imports_count_range"][1]} imports
-- Include appropriate comments and documentation
-- Follow standard Java naming conventions and best practices
-- Make the code realistic and representative of real-world Java applications
-- Do NOT include any intentional errors or problems
-
-Return only the Java code with no additional explanations.
-```java
-// Your code here
-```
-"""
-        return prompt
-       
-    
-    
-   

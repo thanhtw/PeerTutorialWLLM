@@ -14,6 +14,7 @@ class CodeSnippet(BaseModel):
     code: str = Field(description="The Java code snippet")
     known_problems: List[str] = Field(default_factory=list, description="List of known problems in the code")
     raw_errors: Dict[str, List[Dict[str, Any]]] = Field(default_factory=dict, description="Raw error data organized by type")
+    enhanced_errors: List[Dict[str, Any]] = Field(default_factory=list, description="Enhanced error data with location information")
 
 class ReviewAttempt(BaseModel):
     """Schema for a student review attempt"""

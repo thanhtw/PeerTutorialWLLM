@@ -11,6 +11,7 @@ import json
 import random  
 from typing import List, Dict, Any, Optional, Tuple
 from langchain_core.language_models import BaseLanguageModel
+from utils.code_utils import format_list
 
 # Configure logging
 logging.basicConfig(
@@ -41,9 +42,10 @@ class StudentResponseEvaluator:
         self.min_identified_percentage = min_identified_percentage
     
     def evaluate_review(self, 
-                         code_snippet: str,
-                         known_problems: List[str],
-                         student_review: str) -> Dict[str, Any]:
+                     code_snippet: str,
+                     known_problems: List[str],
+                     student_review: str,
+                     enhanced_errors: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Evaluate a student's review of code problems.
         
@@ -51,17 +53,19 @@ class StudentResponseEvaluator:
             code_snippet: The original code snippet with injected errors
             known_problems: List of known problems in the code
             student_review: The student's review comments
+            enhanced_errors: Optional enhanced error data with location information
             
         Returns:
             Dictionary with analysis results
         """
         
-        return self._evaluate_with_llm(code_snippet, known_problems, student_review)
+        return self._evaluate_with_llm(code_snippet, known_problems, student_review, enhanced_errors)
         
     def _evaluate_with_llm(self, 
-                      code_snippet: str,
-                      known_problems: List[str],
-                      student_review: str) -> Dict[str, Any]:
+                  code_snippet: str,
+                  known_problems: List[str],
+                  student_review: str,
+                  enhanced_errors: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Evaluate a student's review using a language model.
         
@@ -69,33 +73,54 @@ class StudentResponseEvaluator:
             code_snippet: The original code snippet with injected errors
             known_problems: List of known problems in the code
             student_review: The student's review comments
+            enhanced_errors: Optional enhanced error data with location information
             
         Returns:
             Dictionary with analysis results
         """
         if not self.llm:
             logger.warning("No LLM provided, falling back to programmatic evaluation")
-            return self._fallback_evaluation(known_problems)  # Add this fallback method
+            return self._fallback_evaluation(known_problems)
             
         # Create a detailed prompt for the LLM
         system_prompt = """You are an expert code review analyzer. When analyzing student reviews:
-1. Be thorough and accurate in your assessment
-2. Return your analysis in valid JSON format with proper escaping
-3. Provide constructive feedback that helps students improve
-4. Be precise in identifying which problems were found and which were missed
-5. Format your response as proper JSON
+    1. Be thorough and accurate in your assessment
+    2. Return your analysis in valid JSON format with proper escaping
+    3. Provide constructive feedback that helps students improve
+    4. Be precise in identifying which problems were found and which were missed
+    5. Format your response as proper JSON
 
-COMPARISON METHOD:
-When comparing student reviews to known problems:
-1. Look for semantic matches, not just exact phrase matches
-2. Consider a problem identified if the student mentions the key aspects of the issue, such as:
-   - The correct location or context of the error (line number, method, class)
-   - The appropriate error type or category (e.g., NullPointerException, naming convention)
-   - A clear description of why it's problematic
-3. If a student identifies a location and a type of error that matches a known problem, count it as identified
-4. Partial credit can be given for partially identified issues (where the student found some aspects but missed others)
-5. False positives are issues reported by the student that don't match any known problems
-"""
+    COMPARISON METHOD:
+    When comparing student reviews to known problems:
+    1. Look for semantic matches, not just exact phrase matches
+    2. Consider a problem identified if the student mentions the key aspects of the issue, such as:
+    - The correct location or context of the error (line number, method, class)
+    - The appropriate error type or category (e.g., NullPointerException, naming convention)
+    - A clear description of why it's problematic
+    3. If a student identifies a location and a type of error that matches a known problem, count it as identified
+    4. Partial credit can be given for partially identified issues (where the student found some aspects but missed others)
+    5. False positives are issues reported by the student that don't match any known problems
+    """
+        
+        # Add detailed error information if available
+        enhanced_errors_section = ""
+        if enhanced_errors:
+            enhanced_errors_section = "\nDETAILED ERROR INFORMATION:\n"
+            for i, error in enumerate(enhanced_errors, 1):
+                error_type = error.get("type", "").upper()
+                name = error.get("name", "")
+                description = error.get("description", "")
+                line_number = error.get("line_number")
+                line_content = error.get("line_content", "")
+                context = error.get("context", "")
+                
+                enhanced_errors_section += f"{i}. {error_type} ERROR - {name}\n"
+                enhanced_errors_section += f"   Description: {description}\n"
+                if line_number:
+                    enhanced_errors_section += f"   Location: Line {line_number}\n"
+                    enhanced_errors_section += f"   Code: {line_content}\n"
+                if context:
+                    enhanced_errors_section += f"   Context:\n```\n{context}\n```\n"
         
         prompt = f"""
     Please analyze how well the student's review identifies the known problems in the code.
@@ -107,6 +132,7 @@ When comparing student reviews to known problems:
 
     KNOWN PROBLEMS IN THE CODE:
     {self._format_list(known_problems)}
+    {enhanced_errors_section}
 
     STUDENT'S REVIEW:
     ```
@@ -371,8 +397,8 @@ When comparing student reviews to known problems:
         }
    
     def _format_list(self, items: List[str]) -> str:
-        """Format a list of items as a bullet list."""
-        return "\n".join([f"- {item}" for item in items])
+        """Format a list of items as a bullet list using shared utility."""
+        return format_list(items)
     
     def generate_targeted_guidance(self,
                                   code_snippet: str,
