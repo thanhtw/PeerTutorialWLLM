@@ -109,6 +109,9 @@ class CodeGenerator:
             domain=domain,
             include_error_annotations=False
         )
+        print("\n========== PROMPT PROMPT PROMPT ==========")       
+        print("Selected Specific Errors:", prompt)
+        print("====================================================")
         
         try:
             # Generate the code using the LLM

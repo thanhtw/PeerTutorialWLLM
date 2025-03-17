@@ -119,6 +119,26 @@ class JavaCodeReviewGraph:
             difficulty_level = state.difficulty_level
             selected_error_categories = state.selected_error_categories
             
+            # Print the selected categories for debugging
+            print("\n========== GENERATE_CODE_NODE ==========")
+            print(f"Code Length: {code_length}")
+            print(f"Difficulty Level: {difficulty_level}")
+            print(f"Selected Error Categories: {selected_error_categories}")
+            
+            # Check if we have valid selected categories
+            if not selected_error_categories or (
+                not selected_error_categories.get("build", []) and 
+                not selected_error_categories.get("checkstyle", [])
+            ):
+                print("WARNING: No error categories selected, using defaults")
+                # Set default categories
+                selected_error_categories = {
+                    "build": ["CompileTimeErrors", "RuntimeErrors", "LogicalErrors"],
+                    "checkstyle": ["NamingConventionChecks", "WhitespaceAndFormattingChecks"]
+                }
+                # Update the state
+                state.selected_error_categories = selected_error_categories
+                
             # Generate code with errors
             # Get errors from selected categories
             selected_errors, basic_problem_descriptions = self.error_repository.get_errors_for_llm(
@@ -126,6 +146,11 @@ class JavaCodeReviewGraph:
                 count=get_error_count_for_difficulty(difficulty_level),
                 difficulty=difficulty_level
             )
+            
+            # Print selected errors for debugging
+            print(f"\nSelected Errors Count: {len(selected_errors)}")
+            for i, error in enumerate(selected_errors):
+                print(f"  {i+1}. {error.get('type', 'Unknown')} - {error.get('name', 'Unknown')}")
                         
             # Generate code with selected errors and get enhanced error information
             code_with_errors, enhanced_errors, detailed_problems = self._generate_code_with_errors(
@@ -146,6 +171,21 @@ class JavaCodeReviewGraph:
                 enhanced_errors=enhanced_errors
             )
             
+            # Print debug information after generation
+            print("\n========== GENERATED CODE SNIPPET ==========")
+            print(f"Code Length: {len(code_with_errors)} characters, {len(code_with_errors.splitlines())} lines")
+            print("\n========== KNOWN PROBLEMS ==========")
+            for i, problem in enumerate(detailed_problems, 1):
+                print(f"{i}. {problem}")
+            print("\n========== ENHANCED ERRORS ==========")
+            for i, error in enumerate(enhanced_errors, 1):
+                print(f"{i}. Type: {error.get('type', 'Unknown')}")
+                print(f"   Name: {error.get('name', 'Unknown')}")
+                print(f"   Description: {error.get('description', 'Unknown')}")
+                print(f"   Line: {error.get('line_number', 'Unknown')}")
+                print(f"   Content: {error.get('line_content', 'Unknown')}")
+                print()
+            
             # Update state
             state.code_snippet = code_snippet
             state.current_step = "review"
@@ -154,6 +194,8 @@ class JavaCodeReviewGraph:
             
         except Exception as e:
             logger.error(f"Error generating code: {str(e)}")
+            import traceback
+            traceback.print_exc()
             state.error = f"Error generating code: {str(e)}"
             return state
     
@@ -163,6 +205,15 @@ class JavaCodeReviewGraph:
             # Get parameters from state
             code_length = state.code_length
             difficulty_level = state.difficulty_level
+            
+            # Print the specific errors for debugging
+            print("\n========== GENERATE_CODE_WITH_SPECIFIC_ERRORS ==========")
+            print(f"Code Length: {code_length}")
+            print(f"Difficulty Level: {difficulty_level}")
+            print(f"Number of Specific Errors: {len(specific_errors)}")
+            
+            for i, error in enumerate(specific_errors):
+                print(f"  {i+1}. {error.get('type', 'Unknown')} - {error.get('name', 'Unknown')} ({error.get('category', 'Unknown')})")
             
             # Format problem descriptions
             problem_descriptions = []
@@ -178,24 +229,46 @@ class JavaCodeReviewGraph:
                     problem_descriptions.append(f"Checkstyle Error - {name}: {description} (Category: {category})")
             
             # Generate code with selected errors
-            code_with_errors = self._generate_code_with_errors(
+            code_with_errors, enhanced_errors, detailed_problems = self._generate_code_with_errors(
                 code_length=code_length,
                 difficulty_level=difficulty_level,
                 selected_errors=specific_errors
             )
             
+            # Use detailed_problems if available, otherwise fall back to basic problem_descriptions
+            final_problems = detailed_problems if detailed_problems else problem_descriptions
+            
             # Create code snippet object
             code_snippet = CodeSnippet(
                 code=code_with_errors,
-                known_problems=problem_descriptions,
+                known_problems=final_problems,
                 raw_errors={
-                    "build": [e for e in specific_errors if e["type"] == "build"],
-                    "checkstyle": [e for e in specific_errors if e["type"] == "checkstyle"]
-                }
+                    "build": [e for e in specific_errors if e.get("type") == "build"],
+                    "checkstyle": [e for e in specific_errors if e.get("type") == "checkstyle"]
+                },
+                enhanced_errors=enhanced_errors if enhanced_errors else []
             )
 
-            print("2===========================================", code_snippet.known_problems)
-            print("3===========================================", code_snippet.raw_errors)
+            # Print debug information after generation
+            print("\n========== GENERATED CODE SNIPPET (SPECIFIC ERRORS) ==========")
+            print(f"Code Length: {len(code_with_errors)} characters, {len(code_with_errors.splitlines())} lines")
+            print("\n========== KNOWN PROBLEMS ==========")
+            for i, problem in enumerate(code_snippet.known_problems, 1):
+                print(f"{i}. {problem}")
+            print("\n========== RAW ERRORS ==========")
+            print(f"Build Errors: {len([e for e in specific_errors if e.get('type') == 'build'])}")
+            print(f"Checkstyle Errors: {len([e for e in specific_errors if e.get('type') == 'checkstyle'])}")
+            
+            # Print enhanced errors if available
+            if enhanced_errors:
+                print("\n========== ENHANCED ERRORS ==========")
+                for i, error in enumerate(enhanced_errors, 1):
+                    print(f"{i}. Type: {error.get('type', 'Unknown')}")
+                    print(f"   Name: {error.get('name', 'Unknown')}")
+                    print(f"   Description: {error.get('description', 'Unknown')}")
+                    print(f"   Line: {error.get('line_number', 'Unknown')}")
+                    print(f"   Content: {error.get('line_content', 'Unknown')}")
+                    print()
             
             # Update state
             state.code_snippet = code_snippet
@@ -205,6 +278,8 @@ class JavaCodeReviewGraph:
             
         except Exception as e:
             logger.error(f"Error generating code with specific errors: {str(e)}")
+            import traceback
+            traceback.print_exc()
             state.error = f"Error generating code with specific errors: {str(e)}"
             return state
     
@@ -358,8 +433,17 @@ class JavaCodeReviewGraph:
                 include_error_annotations=False  # Set to False to remove error annotations
             )
             
+            # Print the prompt for debugging
+            print("\n========== CODE GENERATION PROMPT ==========")
+            print(prompt)
+            
             # Generate code with errors
             response = self.code_generator.llm.invoke(prompt)
+            
+            # Print the LLM response for debugging
+            print("\n========== LLM RESPONSE ==========")
+            print(response)
+            
             code = extract_code_from_response(response)
             
             if code and len(code.strip()) > 50:
@@ -372,6 +456,10 @@ class JavaCodeReviewGraph:
             code_length=code_length,
             difficulty_level=difficulty_level
         )
+        
+        # Print fallback generation for debugging
+        print("\n========== FALLBACK CODE GENERATION ==========")
+        print(base_code)
         
         # Even for fallback, try to enrich the error information
         enhanced_errors, detailed_problems = enrich_error_information(base_code, selected_errors)
