@@ -112,7 +112,7 @@ class JavaCodeReviewGraph:
     
     # Node implementations
     def generate_code_node(self, state: WorkflowState) -> WorkflowState:
-        """Generate Java code with errors node."""
+        """Generate Java code with errors node with enhanced debugging for all modes."""
         try:
             # Get parameters from state
             code_length = state.code_length
@@ -130,15 +130,10 @@ class JavaCodeReviewGraph:
                 not selected_error_categories.get("build", []) and 
                 not selected_error_categories.get("checkstyle", [])
             ):
-                print("WARNING: No error categories selected, using defaults")
-                # Set default categories
-                selected_error_categories = {
-                    "build": ["CompileTimeErrors", "RuntimeErrors", "LogicalErrors"],
-                    "checkstyle": ["NamingConventionChecks", "WhitespaceAndFormattingChecks"]
-                }
-                # Update the state
-                state.selected_error_categories = selected_error_categories
-                
+                # Instead of using defaults, require explicit selection
+                state.error = "No error categories selected. Please select at least one problem area or error category before generating code."
+                return state
+                    
             # Generate code with errors
             # Get errors from selected categories
             selected_errors, basic_problem_descriptions = self.error_repository.get_errors_for_llm(
@@ -147,11 +142,23 @@ class JavaCodeReviewGraph:
                 difficulty=difficulty_level
             )
             
-            # Print selected errors for debugging
-            print(f"\nSelected Errors Count: {len(selected_errors)}")
-            for i, error in enumerate(selected_errors):
-                print(f"  {i+1}. {error.get('type', 'Unknown')} - {error.get('name', 'Unknown')}")
-                        
+            # Enhanced debugging: Print detailed information about selected errors
+            print(f"\n========== SELECTED ERRORS FOR CODE GENERATION ==========")
+            print(f"Total Selected Errors Count: {len(selected_errors)}")
+            
+            if selected_errors:
+                print("\n--- DETAILED ERROR LISTING ---")
+                for i, error in enumerate(selected_errors, 1):
+                    print(f"  {i}. Type: {error.get('type', 'Unknown')}")
+                    print(f"     Name: {error.get('name', 'Unknown')}")
+                    print(f"     Category: {error.get('category', 'Unknown')}")
+                    print(f"     Description: {error.get('description', 'Unknown')}")
+                    if 'implementation_guide' in error:
+                        print(f"     Implementation Guide: {error.get('implementation_guide', '')[:100]}..." 
+                            if len(error.get('implementation_guide', '')) > 100 
+                            else error.get('implementation_guide', ''))
+                    print()
+            
             # Generate code with selected errors and get enhanced error information
             code_with_errors, enhanced_errors, detailed_problems = self._generate_code_with_errors(
                 code_length=code_length,

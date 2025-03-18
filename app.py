@@ -92,7 +92,7 @@ def generate_code_problem(workflow: JavaCodeReviewGraph,
                          selected_error_categories: Dict[str, List[str]],
                          selected_specific_errors: List[Dict[str, Any]] = None):
     """
-    Generate a code problem with progress indicator.
+    Generate a code problem with progress indicator and enhanced error debugging.
     """
     # Show progress during generation
     with st.status("Generating Java code problem...", expanded=True) as status:
@@ -108,7 +108,76 @@ def generate_code_problem(workflow: JavaCodeReviewGraph,
             
             state.code_length = code_length
             state.difficulty_level = difficulty_level
-            state._error_categories = selected_error_categories
+            
+            # Debug print current state before updating
+            print("\n========== GENERATE_CODE_PROBLEM FUNCTION ==========")
+            print(f"UI Selected Categories: {selected_error_categories}")
+            print(f"UI Selected Specific Errors: {len(selected_specific_errors) if selected_specific_errors else 0}")
+            print(f"Mode: {error_selection_mode}")
+            
+            # Explicitly ensure we have some error selections based on the mode
+            has_selections = False
+            
+            if error_selection_mode == "specific" and selected_specific_errors:
+                # Specific errors mode
+                has_selections = len(selected_specific_errors) > 0
+                print(f"Specific mode has selections: {has_selections}")
+                
+            elif error_selection_mode == "standard" or error_selection_mode == "advanced":
+                # Category-based selection modes
+                build_selected = selected_error_categories.get("build", [])
+                checkstyle_selected = selected_error_categories.get("checkstyle", [])
+                has_selections = len(build_selected) > 0 or len(checkstyle_selected) > 0
+                print(f"Category mode has selections: {has_selections} (Build: {len(build_selected)}, Checkstyle: {len(checkstyle_selected)})")
+            
+            # If no selections were made, show error and return
+            if not has_selections:
+                error_msg = "No error categories or specific errors selected. Please select at least one error type."
+                status.update(label=f"Error: {error_msg}", state="error")
+                st.session_state.error = error_msg
+                return False
+            
+            # Update the state with selected error categories
+            # Use only the properly named field without underscore
+            state.selected_error_categories = selected_error_categories
+            
+            print(f"Updated state with categories: {state.selected_error_categories}")
+            
+            # ENHANCED DEBUGGING: Pre-calculate what errors will be selected to show before generation
+            if error_selection_mode != "specific":
+                # This will show you what actual errors are selected from categories before generation
+                from data.json_error_repository import JsonErrorRepository
+                error_repo = JsonErrorRepository()
+                error_count = {
+                    "easy": 2,
+                    "medium": 4,
+                    "hard": 6
+                }.get(difficulty_level.lower(), 4)
+                
+                # Get the actual errors that would be selected for these categories
+                preview_errors, _ = error_repo.get_errors_for_llm(
+                    selected_categories=selected_error_categories,
+                    count=error_count,
+                    difficulty=difficulty_level
+                )
+                
+                print("\n========== PREVIEW OF ERRORS TO BE SENT TO LLM ==========")
+                print(f"The following {len(preview_errors)} errors will be used for code generation:")
+                for i, error in enumerate(preview_errors, 1):
+                    error_type = error.get("type", "Unknown")
+                    name = error.get("name", "Unknown")
+                    category = error.get("category", "Unknown")
+                    print(f"  {i}. {error_type} - {name} (from {category})")
+                    
+                    # FIXED: Proper handling of implementation guide
+                    if "implementation_guide" in error:
+                        implementation_guide = error.get('implementation_guide', '')
+                        if len(implementation_guide) > 100:
+                            print(f"     Implementation: {implementation_guide[:100]}...")
+                        else:
+                            print(f"     Implementation: {implementation_guide}")
+                
+                print("=================================================")
             
             # Run the generation node with appropriate error selection
             status.update(label="Generating code with errors...", state="running")
@@ -577,12 +646,7 @@ def check_ollama_status(llm_manager: LLMManager) -> Dict[str, bool]:
     }
 
 def render_generate_tab(workflow, error_selector_ui, code_display_ui):
-    """Render the code generation tab."""
-    #st.markdown("#### Generate a Java Code Problem")
-    
-    # Create a content card for the form
-    #st.markdown('<div class="content-section">', unsafe_allow_html=True)
-    
+    """Render the code generation tab with improved validation for error selection."""
     left_col, right_col = st.columns([1, 1])
     
     with left_col:
@@ -635,6 +699,9 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui):
                         if category not in selected_categories["checkstyle"]:
                             selected_categories["checkstyle"].append(category)
             
+            # Update session state directly
+            st.session_state.selected_error_categories = selected_categories
+            
             # No specific errors in standard mode
             selected_specific_errors = []
             
@@ -652,25 +719,62 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui):
             error_repository = JsonErrorRepository()
             selected_specific_errors = error_selector_ui.render_specific_error_selection(error_repository)
             
-            # We still need categories for fallback
+            # Empty categories for specific mode since we're using exact errors
             selected_categories = {
-                "build": ["CompileTimeErrors", "RuntimeErrors", "LogicalErrors"],
-                "checkstyle": ["NamingConventionChecks", "WhitespaceAndFormattingChecks"]
+                "build": [],
+                "checkstyle": []
             }
     
     # Generate button - centered at the bottom
     st.markdown("<div style='text-align: center; margin-top: 20px;'>", unsafe_allow_html=True)
-    generate_button = st.button("Generate Code Problem", type="primary", use_container_width=False)
+    
+    # Check if any errors are selected before enabling generation
+    no_errors_selected = (
+        (mode == "standard" and len(problem_areas) == 0) or
+        (mode == "advanced" and 
+         len(selected_categories.get("build", [])) == 0 and 
+         len(selected_categories.get("checkstyle", [])) == 0) or
+        (mode == "specific" and 
+         (selected_specific_errors is None or len(selected_specific_errors) == 0))
+    )
+    
+    # Debug selections before generation
+    print("\n========== GENERATE BUTTON STATE ==========")
+    print(f"Mode: {mode}")
+    if mode == "standard":
+        print(f"Problem areas: {problem_areas}")
+    elif mode == "advanced":
+        print(f"Selected categories: {selected_categories}")
+    else:
+        print(f"Selected specific errors: {len(selected_specific_errors) if selected_specific_errors else 0}")
+    print(f"No errors selected: {no_errors_selected}")
+    
+    if no_errors_selected:
+        st.warning("Please select at least one error type before generating code.")
+        generate_button_disabled = True
+    else:
+        generate_button_disabled = False
+    
+    generate_button = st.button(
+        "Generate Code Problem", 
+        type="primary", 
+        use_container_width=False,
+        disabled=generate_button_disabled
+    )
+    
     st.markdown("</div>", unsafe_allow_html=True)
     
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    if generate_button:
+    if generate_button and not generate_button_disabled:
         # Ensure params has string values for code_length and difficulty_level
         safe_params = {
             "code_length": str(params.get("code_length", "medium")),
             "difficulty_level": str(params.get("difficulty_level", "medium"))
         }
+        
+        # Additional debug before generation
+        print("\n========== GENERATING CODE ==========")
+        print(f"Selected categories: {selected_categories}")
+        print(f"Selected specific errors: {len(selected_specific_errors) if selected_specific_errors else 0}")
         
         success = generate_code_problem(
             workflow,
@@ -686,12 +790,10 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui):
     # Display existing code if available
     state = st.session_state.workflow_state
     if state.code_snippet:
-        #st.markdown('<div class="content-section">', unsafe_allow_html=True)
         code_display_ui.render_code_display(
             state.code_snippet.code,
             state.code_snippet.known_problems if st.session_state.get("instructor_view", False) else None
         )
-        st.markdown('</div>', unsafe_allow_html=True)
 
 def render_review_tab(workflow, code_display_ui):
     """Render the review submission tab with enhanced UI."""

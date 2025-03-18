@@ -20,7 +20,7 @@ def create_code_generation_prompt(
     difficulty_level: str, 
     selected_errors: List[Dict[str, Any]] = None,
     domain: str = None,
-    include_error_annotations: bool = False
+    include_error_annotations: bool = True
 ) -> str:
     """
     Create a prompt for generating Java code with optional errors.
@@ -64,7 +64,7 @@ Requirements:
 - Include appropriate comments and documentation
 - Follow standard Java naming conventions and best practices
 - Make the code realistic and representative of real-world Java applications
-- Do NOT include intentional errors
+- PLS include intentional errors
 
 Return only the Java code with no additional explanations.
 ```java
@@ -98,7 +98,7 @@ Return only the Java code with no additional explanations.
    - Add brief details in the comment about what the error is and why it's problematic"""
     else:
         error_annotation_text = """
-   - Do NOT add any comments or annotations indicating where the errors are
+   - Add any comments or annotations indicating where the errors are
    - The errors should be integrated into the code without explicit markers"""
     
     # Create the appropriate prompt

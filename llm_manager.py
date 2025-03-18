@@ -776,7 +776,7 @@ class LLMManager:
                 
                 elif response.status_code == 404:
                     # Hardware endpoint not available - try alternative detection methods
-                    logger.info("Ollama /api/hardware endpoint not found. Using alternative GPU detection.")
+                    #logger.info("Ollama /api/hardware endpoint not found. Using alternative GPU detection.")
                     return self._detect_gpu_alternative(extended)
             except:
                 # API endpoint might not exist in this Ollama version

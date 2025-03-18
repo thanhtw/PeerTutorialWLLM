@@ -75,7 +75,7 @@ class JsonErrorRepository:
                     with open(file_path, 'r') as file:
                         self.build_errors = json.load(file)
                         self.build_categories = list(self.build_errors.keys())
-                        logger.info(f"Loaded build errors from {file_path} with {len(self.build_categories)} categories")
+                        #logger.info(f"Loaded build errors from {file_path} with {len(self.build_categories)} categories")
                         return True
             
             logger.warning(f"Could not find build errors file: {self.build_errors_path}")
@@ -101,7 +101,7 @@ class JsonErrorRepository:
                     with open(file_path, 'r') as file:
                         self.checkstyle_errors = json.load(file)
                         self.checkstyle_categories = list(self.checkstyle_errors.keys())
-                        logger.info(f"Loaded checkstyle errors from {file_path} with {len(self.checkstyle_categories)} categories")
+                        #logger.info(f"Loaded checkstyle errors from {file_path} with {len(self.checkstyle_categories)} categories")
                         return True
             
             logger.warning(f"Could not find checkstyle errors file: {self.checkstyle_errors_path}")
@@ -297,8 +297,16 @@ class JsonErrorRepository:
         }
         adjusted_count = error_counts.get(difficulty.lower(), count)
         
+        # Enhanced debugging
+        print("\n========== GET_ERRORS_FOR_LLM ==========")
+        print(f"Difficulty: {difficulty}")
+        print(f"Original count: {count}, Adjusted count: {adjusted_count}")
+        
         # If specific errors are provided, use those
         if specific_errors and len(specific_errors) > 0:
+            print("Selection Method: Using specific errors")
+            print(f"Number of specific errors: {len(specific_errors)}")
+            
             selected_errors = specific_errors
             
             # Format problem descriptions
@@ -323,12 +331,19 @@ class JsonErrorRepository:
         
         # Otherwise use category-based selection
         elif selected_categories:
+            print("Selection Method: Using category-based selection")
+            print(f"Selected Categories: {selected_categories}")
+            
             # Check if any categories are actually selected
             build_categories = selected_categories.get("build", [])
             checkstyle_categories = selected_categories.get("checkstyle", [])
             
+            print(f"Build Categories: {build_categories}")
+            print(f"Checkstyle Categories: {checkstyle_categories}")
+            
             if not build_categories and not checkstyle_categories:
                 # Use default categories if none specified
+                print("WARNING: No categories specified, using defaults")
                 selected_categories = {
                     "build": ["CompileTimeErrors", "RuntimeErrors", "LogicalErrors"],
                     "checkstyle": ["NamingConventionChecks", "WhitespaceAndFormattingChecks"]
@@ -345,6 +360,7 @@ class JsonErrorRepository:
                     num_to_select = min(len(category_errors), random.randint(1, 2))
                     if num_to_select > 0:
                         selected_from_category = random.sample(category_errors, num_to_select)
+                        print(f"Selected {num_to_select} errors from build category '{category}'")
                         for error in selected_from_category:
                             all_errors.append({
                                 "type": "build",
@@ -362,6 +378,7 @@ class JsonErrorRepository:
                     num_to_select = min(len(category_errors), random.randint(1, 2))
                     if num_to_select > 0:
                         selected_from_category = random.sample(category_errors, num_to_select)
+                        print(f"Selected {num_to_select} errors from checkstyle category '{category}'")
                         for error in selected_from_category:
                             all_errors.append({
                                 "type": "checkstyle",
@@ -373,8 +390,10 @@ class JsonErrorRepository:
             
             # If we have more errors than needed, randomly select the required number
             if len(all_errors) > adjusted_count:
+                print(f"Too many errors ({len(all_errors)}), selecting {adjusted_count} randomly")
                 selected_errors = random.sample(all_errors, adjusted_count)
             else:
+                print(f"Using all {len(all_errors)} errors from categories")
                 selected_errors = all_errors
             
             # Format problem descriptions
@@ -390,9 +409,16 @@ class JsonErrorRepository:
                 else:  # checkstyle
                     problem_descriptions.append(f"Checkstyle Error - {name}: {description} (Category: {category})")
             
+            # Print final selected errors
+            print("\n--- FINAL SELECTED ERRORS ---")
+            for i, error in enumerate(selected_errors, 1):
+                print(f"  {i}. {error.get('type', 'Unknown')} - {error.get('name', 'Unknown')} ({error.get('category', 'Unknown')})")
+            print("======================================")
+            
             return selected_errors, problem_descriptions
         
         # If no selection method was provided, return empty lists
+        print("WARNING: No selection method provided, returning empty error list")
         return [], []
     
     def _get_implementation_guide(self, error_type: str, error_name: str, category: str) -> Optional[str]:

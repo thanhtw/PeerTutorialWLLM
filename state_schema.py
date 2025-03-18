@@ -33,8 +33,12 @@ class WorkflowState(BaseModel):
     # Code generation parameters
     code_length: str = Field("medium", description="Length of code (short, medium, long)")
     difficulty_level: str = Field("medium", description="Difficulty level (easy, medium, hard)")
+    
+    # IMPORTANT: Replace underscore field with properly named field
+    # Use a single field with a clear name
     selected_error_categories: Dict[str, List[str]] = Field(
-        default_factory=dict, description="Selected error categories"
+        default_factory=lambda: {"build": [], "checkstyle": []}, 
+        description="Selected error categories"
     )
     
     # Code data

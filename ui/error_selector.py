@@ -26,25 +26,25 @@ class ErrorSelectorUI:
     """
     
     def __init__(self):
-        """Initialize the ErrorSelectorUI component."""
-        # Track selected categories - initialize with defaults if not in session state
+        """Initialize the ErrorSelectorUI component with empty selections."""
+        # Track selected categories - initialize with empty collections if not in session state
         if "selected_error_categories" not in st.session_state:
             st.session_state.selected_error_categories = {
-                "build": ["CompileTimeErrors", "RuntimeErrors", "LogicalErrors"],
-                "checkstyle": ["NamingConventionChecks", "WhitespaceAndFormattingChecks"]
+                "build": [],
+                "checkstyle": []
             }
         elif not isinstance(st.session_state.selected_error_categories, dict):
             # Fix if it's not a proper dictionary
             st.session_state.selected_error_categories = {
-                "build": ["CompileTimeErrors", "RuntimeErrors", "LogicalErrors"],
-                "checkstyle": ["NamingConventionChecks", "WhitespaceAndFormattingChecks"]
+                "build": [],
+                "checkstyle": []
             }
         elif "build" not in st.session_state.selected_error_categories or "checkstyle" not in st.session_state.selected_error_categories:
             # Make sure both build and checkstyle keys exist
             if "build" not in st.session_state.selected_error_categories:
-                st.session_state.selected_error_categories["build"] = ["CompileTimeErrors", "RuntimeErrors", "LogicalErrors"]
+                st.session_state.selected_error_categories["build"] = []
             if "checkstyle" not in st.session_state.selected_error_categories:
-                st.session_state.selected_error_categories["checkstyle"] = ["NamingConventionChecks", "WhitespaceAndFormattingChecks"]
+                st.session_state.selected_error_categories["checkstyle"] = []
         
         # Track error selection mode
         if "error_selection_mode" not in st.session_state:
@@ -54,13 +54,13 @@ class ErrorSelectorUI:
         if "expanded_categories" not in st.session_state:
             st.session_state.expanded_categories = {}
             
-        # Track selected specific errors
+        # Track selected specific errors - initialize as empty list
         if "selected_specific_errors" not in st.session_state:
             st.session_state.selected_specific_errors = []
         
-        # Track problem areas
+        # Track problem areas - initialize as empty list
         if "problem_areas" not in st.session_state:
-            st.session_state.problem_areas = ["Style", "Logical", "Performance"]
+            st.session_state.problem_areas = []
         
         # Print initial state for debugging
         print("\n========== ERROR SELECTOR INITIALIZATION ==========")
@@ -72,7 +72,7 @@ class ErrorSelectorUI:
     
     def render_category_selection(self, all_categories: Dict[str, List[str]]) -> Dict[str, List[str]]:
         """
-        Render the error category selection UI for advanced mode.
+        Render the error category selection UI for advanced mode with enhanced debugging.
         
         Args:
             all_categories: Dictionary with 'build' and 'checkstyle' categories
@@ -92,11 +92,22 @@ class ErrorSelectorUI:
         build_categories = all_categories.get("build", [])
         checkstyle_categories = all_categories.get("checkstyle", [])
         
+        # Ensure the session state structure is correct
+        if "selected_error_categories" not in st.session_state:
+            st.session_state.selected_error_categories = {"build": [], "checkstyle": []}
+        if "build" not in st.session_state.selected_error_categories:
+            st.session_state.selected_error_categories["build"] = []
+        if "checkstyle" not in st.session_state.selected_error_categories:
+            st.session_state.selected_error_categories["checkstyle"] = []
+        
         # Build errors section
         st.markdown("<div class='error-type-header'>Build Errors</div>", unsafe_allow_html=True)
         
         # Create a multi-column layout for build errors
         build_cols = st.columns(2)
+        
+        # Get the current selection state from session
+        current_build_selections = st.session_state.selected_error_categories.get("build", [])
         
         # Split the build categories into two columns
         half_length = len(build_categories) // 2
@@ -109,29 +120,35 @@ class ErrorSelectorUI:
                     # Create a unique key for this category
                     category_key = f"build_{category}"
                     
-                    # Check if category is selected
-                    is_selected = st.checkbox(
+                    # Check if category is already selected from session state
+                    is_selected = category in current_build_selections
+                    
+                    # Create the checkbox
+                    selected = st.checkbox(
                         category,
                         key=category_key,
-                        value=category in st.session_state.selected_error_categories.get("build", [])
+                        value=is_selected
                     )
                     
-                    # Update selection state
-                    if is_selected:
-                        if category not in st.session_state.selected_error_categories.get("build", []):
-                            if "build" not in st.session_state.selected_error_categories:
-                                st.session_state.selected_error_categories["build"] = []
-                            st.session_state.selected_error_categories["build"].append(category)
+                    # Update selection state based on checkbox
+                    if selected:
+                        if category not in current_build_selections:
+                            current_build_selections.append(category)
                     else:
-                        if "build" in st.session_state.selected_error_categories and \
-                        category in st.session_state.selected_error_categories["build"]:
-                            st.session_state.selected_error_categories["build"].remove(category)
+                        if category in current_build_selections:
+                            current_build_selections.remove(category)
+        
+        # Update build selections in session state
+        st.session_state.selected_error_categories["build"] = current_build_selections
         
         # Checkstyle errors section
         st.markdown("<div class='error-type-header'>Checkstyle Errors</div>", unsafe_allow_html=True)
         
         # Create a multi-column layout for checkstyle errors
         checkstyle_cols = st.columns(2)
+        
+        # Get the current selection state from session
+        current_checkstyle_selections = st.session_state.selected_error_categories.get("checkstyle", [])
         
         # Split the checkstyle categories into two columns
         half_length = len(checkstyle_categories) // 2
@@ -144,23 +161,26 @@ class ErrorSelectorUI:
                     # Create a unique key for this category
                     category_key = f"checkstyle_{category}"
                     
-                    # Check if category is selected
-                    is_selected = st.checkbox(
+                    # Check if category is already selected from session state
+                    is_selected = category in current_checkstyle_selections
+                    
+                    # Create the checkbox
+                    selected = st.checkbox(
                         category,
                         key=category_key,
-                        value=category in st.session_state.selected_error_categories.get("checkstyle", [])
+                        value=is_selected
                     )
                     
-                    # Update selection state
-                    if is_selected:
-                        if category not in st.session_state.selected_error_categories.get("checkstyle", []):
-                            if "checkstyle" not in st.session_state.selected_error_categories:
-                                st.session_state.selected_error_categories["checkstyle"] = []
-                            st.session_state.selected_error_categories["checkstyle"].append(category)
+                    # Update selection state based on checkbox
+                    if selected:
+                        if category not in current_checkstyle_selections:
+                            current_checkstyle_selections.append(category)
                     else:
-                        if "checkstyle" in st.session_state.selected_error_categories and \
-                        category in st.session_state.selected_error_categories["checkstyle"]:
-                            st.session_state.selected_error_categories["checkstyle"].remove(category)
+                        if category in current_checkstyle_selections:
+                            current_checkstyle_selections.remove(category)
+        
+        # Update checkstyle selections in session state
+        st.session_state.selected_error_categories["checkstyle"] = current_checkstyle_selections
         
         # Selection summary
         build_selected = st.session_state.selected_error_categories.get("build", [])
@@ -168,14 +188,7 @@ class ErrorSelectorUI:
         
         st.write("### Selected Categories")
         if not build_selected and not checkstyle_selected:
-            st.warning("No categories selected. Default categories will be used.")
-            # Set some default categories
-            st.session_state.selected_error_categories = {
-                "build": ["CompileTimeErrors", "RuntimeErrors", "LogicalErrors"],
-                "checkstyle": ["NamingConventionChecks", "WhitespaceAndFormattingChecks"]
-            }
-            build_selected = st.session_state.selected_error_categories.get("build", [])
-            checkstyle_selected = st.session_state.selected_error_categories.get("checkstyle", [])
+            st.warning("No categories selected. You must select at least one category to generate code.")
         
         if build_selected:
             st.write("Build Error Categories:")
@@ -187,11 +200,48 @@ class ErrorSelectorUI:
             for category in checkstyle_selected:
                 st.markdown(f"<div class='error-category'>{category}</div>", unsafe_allow_html=True)
         
-        # Debug print the selected categories
-        print("\n========== SELECTED ERROR CATEGORIES (ADVANCED MODE) ==========")
+        # Enhanced debug output for advanced mode
+        print("\n========== ADVANCED MODE SELECTION ==========")
         print(f"Build Categories: {build_selected}")
         print(f"Checkstyle Categories: {checkstyle_selected}")
-        print("==================================================")
+        
+        # If any categories are selected, show potential errors in each category
+        if build_selected or checkstyle_selected:
+            print("\n--- POTENTIAL ERRORS BY CATEGORY ---")
+            
+            # For build categories
+            for category in build_selected:
+                print(f"Build Category: {category}")
+                # Get sample errors from this category if available
+                try:
+                    from data.json_error_repository import JsonErrorRepository
+                    repo = JsonErrorRepository()
+                    errors = repo.get_category_errors("build", category)
+                    if errors:
+                        print(f"  Sample errors (max 3):")
+                        for i, error in enumerate(errors[:3]):
+                            print(f"    {i+1}. {error.get('error_name', 'Unknown')}: {error.get('description', '')[:50]}..." 
+                                if len(error.get('description', '')) > 50 else error.get('description', ''))
+                except Exception as e:
+                    print(f"  Error retrieving category info: {str(e)}")
+            
+            # For checkstyle categories
+            for category in checkstyle_selected:
+                print(f"Checkstyle Category: {category}")
+                # Get sample errors from this category if available
+                try:
+                    from data.json_error_repository import JsonErrorRepository
+                    repo = JsonErrorRepository()
+                    errors = repo.get_category_errors("checkstyle", category)
+                    if errors:
+                        print(f"  Sample errors (max 3):")
+                        for i, error in enumerate(errors[:3]):
+                            print(f"    {i+1}. {error.get('check_name', 'Unknown')}: {error.get('description', '')[:50]}..." 
+                                if len(error.get('description', '')) > 50 else error.get('description', ''))
+                except Exception as e:
+                    print(f"  Error retrieving category info: {str(e)}")
+        
+        print("=============================================")
         
         return st.session_state.selected_error_categories
     
@@ -344,7 +394,7 @@ class ErrorSelectorUI:
         
     def render_mode_selector(self) -> str:
         """
-        Render the mode selector UI.
+        Render the mode selector UI with improved mode switching behavior.
         
         Returns:
             Selected mode ("standard", "advanced", or "specific")
@@ -392,77 +442,29 @@ class ErrorSelectorUI:
         # Only update if the mode has changed
         if new_mode != st.session_state.error_selection_mode:
             print(f"Mode changing from {st.session_state.error_selection_mode} to {new_mode}")
+            
+            # Store previous mode for reference
+            previous_mode = st.session_state.error_selection_mode
+            
+            # Update the mode
             st.session_state.error_selection_mode = new_mode
             
+            # Importantly: Clear selections when switching TO Advanced mode
+            # This prevents auto-selected categories when changing modes
+            if new_mode == "advanced":
+                # Reset categories to empty when switching to advanced mode
+                st.session_state.selected_error_categories = {
+                    "build": [],
+                    "checkstyle": []
+                }
+                print("Cleared error categories when switching to Advanced mode")
+                
             # Initialize or reset appropriate selections when mode changes
             if new_mode == "standard":
                 # Ensure problem areas are set for Standard mode
                 if not hasattr(st.session_state, "problem_areas") or not st.session_state.problem_areas:
-                    st.session_state.problem_areas = ["Style", "Logical", "Performance"]
-                    
-                # Map problem areas to categories for standard mode
-                problem_areas_config = {
-                    "Style": {
-                        "mapping": {
-                            "build": [],
-                            "checkstyle": ["NamingConventionChecks", "WhitespaceAndFormattingChecks", "JavadocChecks"]
-                        }
-                    },
-                    "Logical": {
-                        "mapping": {
-                            "build": ["LogicalErrors"],
-                            "checkstyle": []
-                        }
-                    },
-                    "Performance": {
-                        "mapping": {
-                            "build": ["RuntimeErrors"],
-                            "checkstyle": ["MetricsChecks"]
-                        }
-                    },
-                    "Security": {
-                        "mapping": {
-                            "build": ["RuntimeErrors", "LogicalErrors"],
-                            "checkstyle": ["CodeQualityChecks"]
-                        }
-                    },
-                    "Design": {
-                        "mapping": {
-                            "build": ["LogicalErrors"],
-                            "checkstyle": ["MiscellaneousChecks", "FileStructureChecks", "BlockChecks"]
-                        }
-                    }
-                }
-                
-                # Initialize selected categories for standard mode
-                selected_categories = {
-                    "build": [],
-                    "checkstyle": []
-                }
-                
-                # Map problem areas to categories
-                for area in st.session_state.problem_areas:
-                    if area in problem_areas_config:
-                        mapping = problem_areas_config[area]["mapping"]
-                        for category in mapping["build"]:
-                            if category not in selected_categories["build"]:
-                                selected_categories["build"].append(category)
-                        for category in mapping["checkstyle"]:
-                            if category not in selected_categories["checkstyle"]:
-                                selected_categories["checkstyle"].append(category)
-                
-                # Update session state
-                st.session_state.selected_error_categories = selected_categories
-                
-            elif new_mode == "advanced":
-                # Ensure some defaults for advanced mode if nothing was selected
-                if (not st.session_state.selected_error_categories.get("build") and 
-                    not st.session_state.selected_error_categories.get("checkstyle")):
-                    st.session_state.selected_error_categories = {
-                        "build": ["CompileTimeErrors", "RuntimeErrors"],
-                        "checkstyle": ["NamingConventionChecks", "WhitespaceAndFormattingChecks"]
-                    }
-            else: # specific mode
+                    st.session_state.problem_areas = []
+            elif new_mode == "specific":
                 # Make sure selected_specific_errors exists
                 if "selected_specific_errors" not in st.session_state:
                     st.session_state.selected_specific_errors = []
@@ -484,14 +486,11 @@ class ErrorSelectorUI:
     def render_simple_mode(self) -> List[str]:
         """
         Render a more professional problem area selection UI with improved styling.
+        Includes enhanced debugging output for problem areas and mapped error categories.
         
         Returns:
             List of selected problem areas
         """
-        # Initialize selected problem areas if not in session state
-        if "problem_areas" not in st.session_state:
-            st.session_state.problem_areas = ["Style", "Logical", "Performance"]
-        
         st.markdown("#### Focus Areas for Code Review")
         st.markdown("Select the categories of issues you want to find in the generated code:")
         
@@ -588,11 +587,9 @@ class ErrorSelectorUI:
         # Update session state
         st.session_state.problem_areas = problem_areas
         
+        # Important change: No longer defaulting to Style if nothing selected
         if not problem_areas:
-            st.warning("Please select at least one problem area.")
-            # Default to Style if nothing selected
-            st.session_state.problem_areas = ["Style"]
-            problem_areas = ["Style"]
+            st.warning("Please select at least one problem area. No errors will be included until you make a selection.")
         
         # Display selected areas with professional badges
         if problem_areas:
@@ -646,12 +643,49 @@ class ErrorSelectorUI:
         # Update session state with the mapping result
         st.session_state.selected_error_categories = selected_categories
         
-        # Debug print the selected categories
-        print("\n========== SELECTED ERROR CATEGORIES ==========")
+        # Enhanced debug print of selected categories with potential errors
+        print("\n========== STANDARD MODE SELECTION ==========")
         print(f"Problem Areas: {problem_areas}")
         print(f"Build Categories: {selected_categories.get('build', [])}")
         print(f"Checkstyle Categories: {selected_categories.get('checkstyle', [])}")
-        print("==================================================")
+        
+        # If any categories are selected, show potential errors
+        if selected_categories["build"] or selected_categories["checkstyle"]:
+            print("\n--- POTENTIAL ERRORS BY CATEGORY ---")
+            
+            # For build categories
+            for category in selected_categories["build"]:
+                print(f"Build Category: {category}")
+                # Get sample errors from this category if available
+                try:
+                    from data.json_error_repository import JsonErrorRepository
+                    repo = JsonErrorRepository()
+                    errors = repo.get_category_errors("build", category)
+                    if errors:
+                        print(f"  Sample errors (max 3):")
+                        for i, error in enumerate(errors[:3]):
+                            print(f"    {i+1}. {error.get('error_name', 'Unknown')}: {error.get('description', '')[:50]}..." 
+                                if len(error.get('description', '')) > 50 else error.get('description', ''))
+                except Exception as e:
+                    print(f"  Error retrieving category info: {str(e)}")
+            
+            # For checkstyle categories
+            for category in selected_categories["checkstyle"]:
+                print(f"Checkstyle Category: {category}")
+                # Get sample errors from this category if available
+                try:
+                    from data.json_error_repository import JsonErrorRepository
+                    repo = JsonErrorRepository()
+                    errors = repo.get_category_errors("checkstyle", category)
+                    if errors:
+                        print(f"  Sample errors (max 3):")
+                        for i, error in enumerate(errors[:3]):
+                            print(f"    {i+1}. {error.get('check_name', 'Unknown')}: {error.get('description', '')[:50]}..." 
+                                if len(error.get('description', '')) > 50 else error.get('description', ''))
+                except Exception as e:
+                    print(f"  Error retrieving category info: {str(e)}")
+        
+        print("=============================================")
         
         return problem_areas
 
