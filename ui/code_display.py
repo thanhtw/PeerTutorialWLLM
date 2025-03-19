@@ -8,7 +8,7 @@ and handling student review input.
 import streamlit as st
 import logging
 from typing import List, Dict, Any, Optional, Tuple, Callable
-from utils.code_utils import add_line_numbers
+from utils.code_utils import add_line_numbers,strip_error_annotations
 
 # Configure logging
 logging.basicConfig(
@@ -25,36 +25,40 @@ class CodeDisplayUI:
     line numbers, and optional instructor view.
     """
     
-    def render_code_display(self, code_snippet: str, known_problems: List[str] = None) -> None:
+    # Update the render_code_display method in ui/code_display.py
+
+    # In ui/code_display.py, update the render_code_display method:
+
+    def render_code_display(self, code_snippet, known_problems: List[str] = None) -> None:
         """
         Render a code snippet with optional known problems for instructor view.
         
         Args:
-            code_snippet: Java code snippet to display
+            code_snippet: Java code snippet to display (string or CodeSnippet object)
             known_problems: Optional list of known problems for instructor view
         """
         if not code_snippet:
             st.info("No code generated yet. Use the 'Generate Code Problem' tab to create a Java code snippet.")
             return
         
-        st.subheader("Java Code to Review:")       
+        st.subheader("Java Code to Review:")
+        
+        # Handle different input types to get the display code
+        if isinstance(code_snippet, str):
+            # If string is passed directly, remove all comments
+            display_code = strip_error_annotations(code_snippet)
+        else:
+            # If it's a CodeSnippet object
+            if hasattr(code_snippet, 'clean_code') and code_snippet.clean_code:
+                # Use clean version for student view
+                display_code = code_snippet.clean_code
+            else:
+                # Only fall back if clean_code is not available, and strip comments
+                display_code = strip_error_annotations(code_snippet.code)
         
         # Add line numbers to the code snippet
-        numbered_code = self._add_line_numbers(code_snippet)
+        numbered_code = self._add_line_numbers(display_code)
         st.code(numbered_code, language="java")
-        
-        # Create a unique key based on content to prevent duplicate keys
-        download_key = f"download_code_{hash(code_snippet)%10000}"
-        
-        # Download button for the code
-        # if st.download_button(
-        #     label="Download Code", 
-        #     data=code_snippet,
-        #     file_name="java_review_problem.java",
-        #     mime="text/plain",
-        #     key=download_key
-        # ):
-        #     st.success("Code downloaded successfully!")
         
         # INSTRUCTOR VIEW: Show known problems if provided
         if known_problems:
@@ -62,6 +66,13 @@ class CodeDisplayUI:
                 st.subheader("Known Problems:")
                 for i, problem in enumerate(known_problems, 1):
                     st.markdown(f"{i}. {problem}")
+                    
+                # Add option to view annotated code with error comments for instructors
+                if isinstance(code_snippet, object) and hasattr(code_snippet, 'code'):
+                    if st.checkbox("Show Annotated Code (with Error Comments)", value=False):
+                        st.subheader("Annotated Code (with Error Comments):")
+                        annotated_code = self._add_line_numbers(code_snippet.code)
+                        st.code(annotated_code, language="java")
     
     def _add_line_numbers(self, code: str) -> str:
         """Add line numbers to code snippet using shared utility."""

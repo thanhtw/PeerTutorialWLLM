@@ -8,6 +8,18 @@ from generated code to improve the review evaluation process.
 import re
 from typing import List, Dict, Any, Tuple, Optional
 
+# Add this helper function to extract_error_locations in utils/enhanced_error_tracking.py
+
+def is_error_annotation(line: str) -> bool:
+    """
+    Check if a line is a comment line.    
+    Args:
+        line: The line to check        
+    Returns:
+        True if the line is a comment, False otherwise
+    """
+    return line.strip().startswith("//")
+
 def extract_error_locations(
     code: str,
     errors: List[Dict[str, Any]]
@@ -406,6 +418,8 @@ def generate_problem_descriptions(enhanced_errors: List[Dict[str, Any]]) -> List
     
     return problem_descriptions
 
+# Update the enrich_error_information function in utils/enhanced_error_tracking.py
+
 def enrich_error_information(
     code: str, 
     selected_errors: List[Dict[str, Any]]
@@ -414,7 +428,7 @@ def enrich_error_information(
     Enrich error information with location data and generate problem descriptions.
     
     Args:
-        code: Generated Java code with errors
+        code: Generated Java code with errors (should be the clean version without annotations)
         selected_errors: Original errors from the repository
         
     Returns:

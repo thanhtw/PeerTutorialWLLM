@@ -9,9 +9,12 @@ __all__ = ['WorkflowState', 'CodeSnippet', 'ReviewAttempt']
 from typing import List, Dict, Any, Optional, TypedDict, Literal
 from pydantic import BaseModel, Field
 
+# Update the CodeSnippet class in state_schema.py
+
 class CodeSnippet(BaseModel):
     """Schema for code snippet data"""
-    code: str = Field(description="The Java code snippet")
+    code: str = Field(description="The Java code snippet with annotations")
+    clean_code: str = Field("", description="The Java code snippet without annotations")
     known_problems: List[str] = Field(default_factory=list, description="List of known problems in the code")
     raw_errors: Dict[str, List[Dict[str, Any]]] = Field(default_factory=dict, description="Raw error data organized by type")
     enhanced_errors: List[Dict[str, Any]] = Field(default_factory=list, description="Enhanced error data with location information")

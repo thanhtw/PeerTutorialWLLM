@@ -26,7 +26,8 @@ from utils.code_utils import (
     extract_code_from_response, 
     add_error_comments,
     get_error_count_for_difficulty,
-    generate_comparison_report
+    generate_comparison_report,
+    strip_error_annotations
 )
 from utils.enhanced_error_tracking import enrich_error_information
 
@@ -111,6 +112,8 @@ class JavaCodeReviewGraph:
         return workflow
     
     # Node implementations
+    # Update the generate_code_node method in langgraph_workflow.py
+
     def generate_code_node(self, state: WorkflowState) -> WorkflowState:
         """Generate Java code with errors node with enhanced debugging for all modes."""
         try:
@@ -160,7 +163,8 @@ class JavaCodeReviewGraph:
                     print()
             
             # Generate code with selected errors and get enhanced error information
-            code_with_errors, enhanced_errors, detailed_problems = self._generate_code_with_errors(
+            # Now returns both annotated and clean versions
+            annotated_code, clean_code, enhanced_errors, detailed_problems = self._generate_code_with_errors(
                 code_length=code_length,
                 difficulty_level=difficulty_level,
                 selected_errors=selected_errors
@@ -168,7 +172,8 @@ class JavaCodeReviewGraph:
             
             # Create code snippet object with enhanced information
             code_snippet = CodeSnippet(
-                code=code_with_errors,
+                code=annotated_code,  # Store annotated version with error comments
+                clean_code=clean_code,  # Store clean version without error comments
                 known_problems=detailed_problems,  # Use the detailed problems instead
                 raw_errors={
                     "build": [e for e in enhanced_errors if e["type"] == "build"],
@@ -180,7 +185,8 @@ class JavaCodeReviewGraph:
             
             # Print debug information after generation
             print("\n========== GENERATED CODE SNIPPET ==========")
-            print(f"Code Length: {len(code_with_errors)} characters, {len(code_with_errors.splitlines())} lines")
+            print(f"Annotated Code Length: {len(annotated_code)} characters, {len(annotated_code.splitlines())} lines")
+            print(f"Clean Code Length: {len(clean_code)} characters, {len(clean_code.splitlines())} lines")
             print("\n========== KNOWN PROBLEMS ==========")
             for i, problem in enumerate(detailed_problems, 1):
                 print(f"{i}. {problem}")
@@ -205,7 +211,10 @@ class JavaCodeReviewGraph:
             traceback.print_exc()
             state.error = f"Error generating code: {str(e)}"
             return state
+                
     
+    # Update the generate_code_with_specific_errors method in langgraph_workflow.py
+
     def generate_code_with_specific_errors(self, state: WorkflowState, specific_errors: List[Dict[str, Any]]) -> WorkflowState:
         """Generate Java code with specific errors selected by the user."""
         try:
@@ -235,8 +244,8 @@ class JavaCodeReviewGraph:
                 else:  # checkstyle
                     problem_descriptions.append(f"Checkstyle Error - {name}: {description} (Category: {category})")
             
-            # Generate code with selected errors
-            code_with_errors, enhanced_errors, detailed_problems = self._generate_code_with_errors(
+            # Generate code with selected errors - now returns both versions
+            annotated_code, clean_code, enhanced_errors, detailed_problems = self._generate_code_with_errors(
                 code_length=code_length,
                 difficulty_level=difficulty_level,
                 selected_errors=specific_errors
@@ -245,9 +254,10 @@ class JavaCodeReviewGraph:
             # Use detailed_problems if available, otherwise fall back to basic problem_descriptions
             final_problems = detailed_problems if detailed_problems else problem_descriptions
             
-            # Create code snippet object
+            # Create code snippet object with both code versions
             code_snippet = CodeSnippet(
-                code=code_with_errors,
+                code=annotated_code,  # Annotated version with error comments
+                clean_code=clean_code,  # Clean version without error comments
                 known_problems=final_problems,
                 raw_errors={
                     "build": [e for e in specific_errors if e.get("type") == "build"],
@@ -258,7 +268,8 @@ class JavaCodeReviewGraph:
 
             # Print debug information after generation
             print("\n========== GENERATED CODE SNIPPET (SPECIFIC ERRORS) ==========")
-            print(f"Code Length: {len(code_with_errors)} characters, {len(code_with_errors.splitlines())} lines")
+            print(f"Annotated Code Length: {len(annotated_code)} characters, {len(annotated_code.splitlines())} lines")
+            print(f"Clean Code Length: {len(clean_code)} characters, {len(clean_code.splitlines())} lines")
             print("\n========== KNOWN PROBLEMS ==========")
             for i, problem in enumerate(code_snippet.known_problems, 1):
                 print(f"{i}. {problem}")
@@ -428,8 +439,22 @@ class JavaCodeReviewGraph:
         return "continue_review"
     
     # Helper methods
-    def _generate_code_with_errors(self, code_length: str, difficulty_level: str, selected_errors: List[Dict[str, Any]]) -> Tuple[str, List[Dict[str, Any]], List[str]]:
-        """Generate Java code with the selected errors."""
+    # Replace the _generate_code_with_errors method in langgraph_workflow.py
+
+    # In langgraph_workflow.py, update the _generate_code_with_errors method:
+
+    def _generate_code_with_errors(self, code_length: str, difficulty_level: str, selected_errors: List[Dict[str, Any]]) -> Tuple[str, str, List[Dict[str, Any]], List[str]]:
+        """
+        Generate Java code with the selected errors, returning both annotated and clean versions.
+        
+        Args:
+            code_length: Length of code (short, medium, long)
+            difficulty_level: Difficulty level (easy, medium, hard)
+            selected_errors: List of selected errors to include in the code
+        
+        Returns:
+            Tuple of (annotated_code, clean_code, enhanced_errors, detailed_problems)
+        """
         # Use the code generator to create code with errors
         if hasattr(self.code_generator, 'llm') and self.code_generator.llm:
             # Create a detailed prompt for the LLM
@@ -437,7 +462,7 @@ class JavaCodeReviewGraph:
                 code_length=code_length,
                 difficulty_level=difficulty_level,
                 selected_errors=selected_errors,
-                include_error_annotations=False  # Set to False to remove error annotations
+                include_error_annotations=True  # Generate code with annotations
             )
             
             # Print the prompt for debugging
@@ -451,12 +476,23 @@ class JavaCodeReviewGraph:
             print("\n========== LLM RESPONSE ==========")
             print(response)
             
-            code = extract_code_from_response(response)
+            # Extract the code with annotations
+            annotated_code = extract_code_from_response(response)
             
-            if code and len(code.strip()) > 50:
-                # Enrich the error information with location details
-                enhanced_errors, detailed_problems = enrich_error_information(code, selected_errors)
-                return code, enhanced_errors, detailed_problems
+            if annotated_code and len(annotated_code.strip()) > 50:
+                # Create clean version by stripping ALL comments
+                clean_code = strip_error_annotations(annotated_code)
+                
+                # Debug output to check the cleaning process
+                print("\n========== CLEAN CODE GENERATION ==========")
+                print(f"Annotated Code Length: {len(annotated_code.splitlines())} lines")
+                print(f"Clean Code Length: {len(clean_code.splitlines())} lines")
+                print(f"Removed {len(annotated_code.splitlines()) - len(clean_code.splitlines())} comment lines")
+                
+                # Enrich the error information using the clean code
+                enhanced_errors, detailed_problems = enrich_error_information(clean_code, selected_errors)
+                
+                return annotated_code, clean_code, enhanced_errors, detailed_problems
         
         # Fallback: generate clean code and manually note errors
         base_code = self.code_generator.generate_java_code(
@@ -468,9 +504,16 @@ class JavaCodeReviewGraph:
         print("\n========== FALLBACK CODE GENERATION ==========")
         print(base_code)
         
+        # Create clean code (same as base code in this case, but without comments)
+        clean_code = strip_error_annotations(base_code)
+        
+        # For fallback, keep the base code as annotated version
+        annotated_code = base_code
+        
         # Even for fallback, try to enrich the error information
-        enhanced_errors, detailed_problems = enrich_error_information(base_code, selected_errors)
-        return base_code, enhanced_errors, detailed_problems
+        enhanced_errors, detailed_problems = enrich_error_information(clean_code, selected_errors)
+        
+        return annotated_code, clean_code, enhanced_errors, detailed_problems
         
     def _generate_comparison_report(self, known_problems: List[str], review_analysis: Dict[str, Any]) -> str:
         """Generate a comparison report between student review and known problems."""

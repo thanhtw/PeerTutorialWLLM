@@ -98,7 +98,7 @@ Return only the Java code with no additional explanations.
    - Add brief details in the comment about what the error is and why it's problematic"""
     else:
         error_annotation_text = """
-   - Add any comments or annotations indicating where the errors are
+   - Do NOT add any comments or annotations indicating where the errors are
    - The errors should be integrated into the code without explicit markers"""
     
     # Create the appropriate prompt
@@ -444,3 +444,54 @@ This format helps others quickly understand the location, type, and impact of ea
 """
     
     return report
+
+
+# Add this function to utils/code_utils.py
+
+# In utils/code_utils.py, replace the existing strip_error_annotations function with this:
+
+def strip_error_annotations(code: str) -> str:
+    """
+    Remove only error annotation comments from code while preserving string literals.
+    This targeted approach keeps legitimate comments and code intact.
+    
+    Args:
+        code: The code with error annotations
+        
+    Returns:
+        Clean code without error annotations
+    """
+    import re
+    
+    # Skip processing if code is empty
+    if not code:
+        return code
+    
+    # Only match and remove specific error annotation patterns
+    error_patterns = [
+        # Standard error annotations
+        r'^\s*//\s*ERROR TYPE:.*\n',
+        r'^\s*//\s*Category:.*\n',
+        r'^\s*//\s*Description:.*\n',
+        r'^\s*//\s*Method \d+:\s*.*ERROR.*\n',
+        r'^\s*//\s*ERROR NAME:.*\n',
+        r'^\s*//\s*IMPLEMENTATION:.*\n',
+        
+        # Lines containing common error keywords
+        r'^\s*//.*ERROR.*(?:CHECKSTYLE|BUILD).*\n',
+        r'^\s*//\s*(?:LOGIC|DESIGN|STYLE)\s*ERROR.*\n',
+        
+        # Other annotation formats
+        r'^\s*//\s*TODO: Fix.*\n',
+        r'^\s*//\s*FIXME:.*\n'
+    ]
+    
+    # Apply each pattern one by one
+    result = code
+    for pattern in error_patterns:
+        result = re.sub(pattern, '', result, flags=re.MULTILINE)
+    
+    # Clean up any empty lines created by removing annotations
+    result = re.sub(r'\n\s*\n\s*\n', '\n\n', result)
+    
+    return result
