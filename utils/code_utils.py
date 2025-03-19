@@ -23,7 +23,7 @@ def create_code_generation_prompt(
     include_error_annotations: bool = True
 ) -> str:
     """
-    Create a prompt for generating Java code with optional errors.
+    Create a prompt for generating Java code with standardized error annotations.
     
     Args:
         code_length: Length of code (short, medium, long)
@@ -73,7 +73,7 @@ Return only the Java code with no additional explanations.
 """
         return prompt
     
-    # Create error instructions
+    # Create error instructions with standardized format
     error_instructions = ""
     for i, error in enumerate(selected_errors, 1):
         error_type = error["type"]
@@ -87,19 +87,27 @@ Return only the Java code with no additional explanations.
         error_instructions += f"   Description: {description}\n"
         error_instructions += f"   Implementation: {implementation_guide}\n\n"
 
+    # Define standardized error annotation format based on preference
+    annotation_instruction = ""
+    if include_error_annotations:
+        annotation_instruction = """
+3. For each error you include, add EXACTLY ONE error annotation directly above the line with the error, using this EXACT format:
+   // ERROR: [TYPE] - [NAME] - [Brief explanation]
+   
+   For example:
+   // ERROR: BUILD - NullPointerException - Object accessed without null check
+   // ERROR: CHECKSTYLE - MethodName - Method name should be lowerCamelCase
+   
+   Do not use any other annotation formats like "TODO", "FIXME", etc. Use only the format specified above.
+"""
+    else:
+        annotation_instruction = """
+3. Do NOT add any comments or annotations indicating where the errors are.
+   The errors should be integrated into the code without any explicit markers.
+"""
+    
     # Check if reasoning mode is enabled
     reasoning_mode = os.getenv("REASONING_MODE", "false").lower() == "true"
-    
-    # Define error annotation text based on preference
-    error_annotation_text = ""
-    if include_error_annotations:
-        error_annotation_text = """
-   - Add a comment with "ERROR TYPE: ERROR NAME" directly above the line containing the error
-   - Add brief details in the comment about what the error is and why it's problematic"""
-    else:
-        error_annotation_text = """
-   - Do NOT add any comments or annotations indicating where the errors are
-   - The errors should be integrated into the code without explicit markers"""
     
     # Create the appropriate prompt
     if reasoning_mode:
@@ -119,10 +127,7 @@ Let's think through this step by step:
 
 Requirements:
 1. Write a complete, compilable Java code (except for the intentional errors)
-2. Make the code realistic and representative of actual Java applications
-3. For each error you include:
-   - Make sure it exactly matches the description provided
-   - Place it at a logical location in the code{error_annotation_text}
+2. Make the code realistic and representative of actual Java applications{annotation_instruction}
 4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
 5. Return your final code in a code block with ``` delimiters
 
@@ -138,10 +143,7 @@ The code should be realistic, well-structured, and include the following specifi
 
 Requirements:
 1. Write a complete, compilable Java code (except for the intentional errors)
-2. Make the code realistic and representative of actual Java applications
-3. For each error you include:
-   - Make sure it exactly matches the description provided
-   - Place it at a logical location in the code{error_annotation_text}
+2. Make the code realistic and representative of actual Java applications{annotation_instruction}
 4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
 5. Return your final code in a code block with ``` delimiters
 
@@ -446,14 +448,11 @@ This format helps others quickly understand the location, type, and impact of ea
     return report
 
 
-# Add this function to utils/code_utils.py
-
-# In utils/code_utils.py, replace the existing strip_error_annotations function with this:
-
 def strip_error_annotations(code: str) -> str:
     """
-    Remove only error annotation comments from code while preserving string literals.
-    This targeted approach keeps legitimate comments and code intact.
+    Remove error annotation comments from code while preserving string literals.
+    Focused on standardized format: // ERROR: [TYPE] - [NAME] - [Description]
+    but still handles legacy formats for backward compatibility.
     
     Args:
         code: The code with error annotations
@@ -467,27 +466,34 @@ def strip_error_annotations(code: str) -> str:
     if not code:
         return code
     
-    # Only match and remove specific error annotation patterns
+    # Standard format pattern (should match most generated annotations)
+    standard_pattern = r'^\s*//\s*ERROR:\s*\[.*?\].*\n'
+    
+    # Match and remove specific error annotation patterns
     error_patterns = [
-        # Standard error annotations
+        # Primary standardized format
+        r'^\s*//\s*ERROR:\s*.*-.*\n',
+        
+        # Legacy formats for backward compatibility
         r'^\s*//\s*ERROR TYPE:.*\n',
-        r'^\s*//\s*Category:.*\n',
-        r'^\s*//\s*Description:.*\n',
-        r'^\s*//\s*Method \d+:\s*.*ERROR.*\n',
         r'^\s*//\s*ERROR NAME:.*\n',
-        r'^\s*//\s*IMPLEMENTATION:.*\n',
-        
-        # Lines containing common error keywords
-        r'^\s*//.*ERROR.*(?:CHECKSTYLE|BUILD).*\n',
-        r'^\s*//\s*(?:LOGIC|DESIGN|STYLE)\s*ERROR.*\n',
-        
-        # Other annotation formats
         r'^\s*//\s*TODO: Fix.*\n',
-        r'^\s*//\s*FIXME:.*\n'
+        r'^\s*//\s*FIXME:.*\n',
+        
+        # Very specific patterns that indicate error annotations
+        r'^\s*//.*BUILD ERROR.*\n',
+        r'^\s*//.*CHECKSTYLE ERROR.*\n',
+        r'^\s*//.*LOGICAL ERROR.*\n',
+        r'^\s*//.*RUNTIME ERROR.*\n',
+        
+        # General case for problem area annotations
+        r'^\s*//\s*Problem area:.*\n',
     ]
     
-    # Apply each pattern one by one
-    result = code
+    # First try to remove all standardized annotations
+    result = re.sub(standard_pattern, '', code, flags=re.MULTILINE)
+    
+    # Then apply each pattern one by one for legacy formats
     for pattern in error_patterns:
         result = re.sub(pattern, '', result, flags=re.MULTILINE)
     
