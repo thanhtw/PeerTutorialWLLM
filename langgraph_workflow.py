@@ -443,6 +443,8 @@ class JavaCodeReviewGraph:
 
     # In langgraph_workflow.py, update the _generate_code_with_errors method:
 
+    # In langgraph_workflow.py, update the _generate_code_with_errors method to ensure clean code is properly cleaned:
+
     def _generate_code_with_errors(self, code_length: str, difficulty_level: str, selected_errors: List[Dict[str, Any]]) -> Tuple[str, str, List[Dict[str, Any]], List[str]]:
         """
         Generate Java code with the selected errors, returning both annotated and clean versions.
@@ -457,43 +459,101 @@ class JavaCodeReviewGraph:
         """
         # Use the code generator to create code with errors
         if hasattr(self.code_generator, 'llm') and self.code_generator.llm:
-            # Create a detailed prompt for the LLM
-            prompt = create_code_generation_prompt(
-                code_length=code_length,
-                difficulty_level=difficulty_level,
-                selected_errors=selected_errors,
-                include_error_annotations=True  # Generate code with annotations
-            )
-            
-            # Print the prompt for debugging
-            print("\n========== CODE GENERATION PROMPT ==========")
-            print(prompt)
-            
-            # Generate code with errors
-            response = self.code_generator.llm.invoke(prompt)
-            
-            # Print the LLM response for debugging
-            print("\n========== LLM RESPONSE ==========")
-            print(response)
-            
-            # Extract the code with annotations
-            annotated_code = extract_code_from_response(response)
-            
-            if annotated_code and len(annotated_code.strip()) > 50:
-                # Create clean version by stripping ALL comments
-                clean_code = strip_error_annotations(annotated_code)
-                
-                # Debug output to check the cleaning process
-                print("\n========== CLEAN CODE GENERATION ==========")
-                print(f"Annotated Code Length: {len(annotated_code.splitlines())} lines")
-                print(f"Clean Code Length: {len(clean_code.splitlines())} lines")
-                print(f"Removed {len(annotated_code.splitlines()) - len(clean_code.splitlines())} comment lines")
-                
-                # Enrich the error information using the clean code
-                enhanced_errors, detailed_problems = enrich_error_information(clean_code, selected_errors)
-                
-                return annotated_code, clean_code, enhanced_errors, detailed_problems
+            # Import the validation function
+            from utils.error_validation import validate_code_errors
         
+            # Track attempts to generate proper code with errors
+            max_attempts = 3
+            current_attempt = 0
+            best_code = None
+            best_validation = None
+            
+            while current_attempt < max_attempts:
+                current_attempt += 1
+                
+                # Create a detailed prompt for the LLM
+                prompt = create_code_generation_prompt(
+                    code_length=code_length,
+                    difficulty_level=difficulty_level,
+                    selected_errors=selected_errors,
+                    include_error_annotations=True  # Generate code with annotations
+                )
+                
+                # Print the prompt for debugging
+                print(f"\n========== CODE GENERATION PROMPT (Attempt {current_attempt}/{max_attempts}) ==========")
+                print(prompt)
+                
+                # Generate code with errors
+                response = self.code_generator.llm.invoke(prompt)
+                
+                # Print the LLM response for debugging
+                print(f"\n========== LLM RESPONSE (Attempt {current_attempt}/{max_attempts}) ==========")
+                print(response)
+                
+                # Extract the code with annotations
+                annotated_code = extract_code_from_response(response)
+                
+                if annotated_code and len(annotated_code.strip()) > 50:
+                    # Create clean version by stripping ALL comments
+                    clean_code = strip_error_annotations(annotated_code)
+                    
+                    # Debug output to check the cleaning process
+                    print("\n========== CLEAN CODE GENERATION ==========")
+                    print(f"Annotated Code Length: {len(annotated_code.splitlines())} lines")
+                    print(f"Clean Code Length: {len(clean_code.splitlines())} lines")
+                    print(f"Removed {len(annotated_code.splitlines()) - len(clean_code.splitlines())} comment lines")
+                    
+                    # Validate that the code actually contains the requested errors
+                    validation_results = validate_code_errors(clean_code, selected_errors)
+                    
+                    print("\n========== CODE VALIDATION RESULTS ==========")
+                    print(f"Valid: {validation_results['valid']}")
+                    print(f"Found Errors: {validation_results['found_errors']}")
+                    print(f"Missing Errors: {validation_results['missing_errors']}")
+                    
+                    # If all errors are implemented, we're done
+                    if validation_results['valid']:
+                        print(f"✅ Valid code with all errors implemented (Attempt {current_attempt})")
+                        # Enrich the error information using the clean code
+                        enhanced_errors, detailed_problems = enrich_error_information(clean_code, selected_errors)
+                        return annotated_code, clean_code, enhanced_errors, detailed_problems
+                    
+                    # Otherwise, store the best result so far (most errors implemented)
+                    if best_validation is None or len(validation_results['found_errors']) > len(best_validation['found_errors']):
+                        best_code = (annotated_code, clean_code)
+                        best_validation = validation_results
+                        
+                    # If we've found at least 70% of the errors, that's good enough
+                    if len(validation_results['found_errors']) >= int(0.7 * len(selected_errors)):
+                        print(f"✅ Found {len(validation_results['found_errors'])}/{len(selected_errors)} errors (>= 70%), accepting result")
+                        # Enrich the error information using the clean code
+                        enhanced_errors, detailed_problems = enrich_error_information(clean_code, selected_errors)
+                        return annotated_code, clean_code, enhanced_errors, detailed_problems
+                    
+                    # If this is our last attempt, provide feedback in the retry
+                    if current_attempt < max_attempts:
+                        # Enhance the prompt with specific guidance on missing errors
+                        missing_errors_info = "\n\nYOUR PREVIOUS ATTEMPT MISSED THESE ERRORS:\n"
+                        for error_name in validation_results['missing_errors']:
+                            for error in selected_errors:
+                                error_key = f"{error.get('type', '').upper()} - {error.get('name', '')}"
+                                if error_key == error_name:
+                                    missing_errors_info += f"- {error_name}: {error.get('description', '')}\n"
+                                    missing_errors_info += f"  Implementation: {error.get('implementation_guide', '')}\n"
+                                    break
+                        
+                        # Add this information to the prompt
+                        prompt += missing_errors_info
+                        prompt += "\nPlease try again and make sure to implement ALL the requested errors in the code!"
+            
+            # If we've tried our maximum attempts but still haven't found all errors,
+            # use the best result so far
+            if best_code:
+                print(f"⚠️ Using best result after {max_attempts} attempts - found {len(best_validation['found_errors'])}/{len(selected_errors)} errors")
+                annotated_code, clean_code = best_code
+                enhanced_errors, detailed_problems = enrich_error_information(clean_code, selected_errors)
+                return annotated_code, clean_code, enhanced_errors, detailed_problems
+            
         # Fallback: generate clean code and manually note errors
         base_code = self.code_generator.generate_java_code(
             code_length=code_length,

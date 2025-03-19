@@ -109,14 +109,28 @@ Return only the Java code with no additional explanations.
     # Check if reasoning mode is enabled
     reasoning_mode = os.getenv("REASONING_MODE", "false").lower() == "true"
     
+    # Common error examples to help the LLM understand
+    error_examples = """
+ERROR IMPLEMENTATION EXAMPLES:
+- For "Cannot find symbol" error: Use a variable name like 'count' that was never declared (e.g., 'int result = count + 5;')
+- For "Incompatible types" error: Assign a String to an int (e.g., 'int value = "hello";')
+- For "MemberName" error: Use a variable name that violates conventions (e.g., 'private String User_Name;' instead of 'userName')
+- For "TypeName" error: Define a class with lowercase first letter (e.g., 'class myClass' instead of 'MyClass')
+- For "NullPointerException" error: Call a method on an object that is null (e.g., 'String s = null; int length = s.length();')
+
+IMPORTANT: DO NOT just write correct code with error annotations. You MUST actually introduce the specified errors into the code itself.
+"""
+    
     # Create the appropriate prompt
     if reasoning_mode:
         prompt = f"""You are an expert Java programming educator who creates code review exercises with intentional errors.
 
 Please create a {code_length} Java code example for a {domain} system with {complexity_profile}.
-The code should be realistic, well-structured, and include the following specific errors:
+The code should be realistic, well-structured, and MUST CONTAIN the following specific errors:
 
 {error_instructions}
+
+{error_examples}
 
 Let's think through this step by step:
 
@@ -127,7 +141,8 @@ Let's think through this step by step:
 
 Requirements:
 1. Write a complete, compilable Java code (except for the intentional errors)
-2. Make the code realistic and representative of actual Java applications{annotation_instruction}
+2. Make the code realistic and representative of actual Java applications
+3. ACTUALLY IMPLEMENT the errors in the code according to their implementation guides{annotation_instruction}
 4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
 5. Return your final code in a code block with ``` delimiters
 
@@ -137,15 +152,20 @@ I'll now create the Java code with the required errors:
         prompt = f"""You are an expert Java programming educator who creates code review exercises with intentional errors.
 
 Please create a {code_length} Java code example for a {domain} system with {complexity_profile}.
-The code should be realistic, well-structured, and include the following specific errors:
+The code should be realistic, well-structured, and MUST CONTAIN the following specific errors:
 
 {error_instructions}
 
+{error_examples}
+
 Requirements:
 1. Write a complete, compilable Java code (except for the intentional errors)
-2. Make the code realistic and representative of actual Java applications{annotation_instruction}
+2. Make the code realistic and representative of actual Java applications
+3. ACTUALLY IMPLEMENT the errors in the code according to their implementation guides{annotation_instruction}
 4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
 5. Return your final code in a code block with ``` delimiters
+
+IMPORTANT: You MUST actually introduce these errors into the code, not just add annotations. For example, if an error is about "Cannot find symbol", use a variable that hasn't been defined. If it's about naming conventions, use names that violate the conventions.
 
 Return ONLY the Java code with the errors included. Do not include any explanations or JSON formatting.
 """
@@ -448,17 +468,21 @@ This format helps others quickly understand the location, type, and impact of ea
     return report
 
 
+# In utils/code_utils.py, replace the strip_error_annotations function:
+
 def strip_error_annotations(code: str) -> str:
     """
     Remove error annotation comments from code while preserving string literals.
     Focused on standardized format: // ERROR: [TYPE] - [NAME] - [Description]
     but still handles legacy formats for backward compatibility.
+    Preserves comments that start with "// Intentional error:" as these indicate
+    deliberate errors for educational purposes.
     
     Args:
         code: The code with error annotations
         
     Returns:
-        Clean code without error annotations
+        Clean code without error annotations (except for "// Intentional error:" comments)
     """
     import re
     
@@ -490,12 +514,36 @@ def strip_error_annotations(code: str) -> str:
         r'^\s*//\s*Problem area:.*\n',
     ]
     
-    # First try to remove all standardized annotations
-    result = re.sub(standard_pattern, '', code, flags=re.MULTILINE)
+    # Process the code line by line to preserve "// Intentional error:" comments
+    lines = code.splitlines()
+    result_lines = []
     
-    # Then apply each pattern one by one for legacy formats
-    for pattern in error_patterns:
-        result = re.sub(pattern, '', result, flags=re.MULTILINE)
+    for line in lines:
+        # Skip lines that match our error patterns unless they start with "// Intentional error:"
+        if re.match(r'^\s*//\s*Intentional error:', line):
+            # Keep this line - it's an intentional error marker we want to preserve
+            result_lines.append(line)
+            continue
+            
+        # Check if this line matches any of our error annotation patterns
+        is_error_annotation = False
+        
+        # Check against standard pattern
+        if re.match(standard_pattern, line):
+            is_error_annotation = True
+        else:
+            # Check against other patterns
+            for pattern in error_patterns:
+                if re.match(pattern, line):
+                    is_error_annotation = True
+                    break
+        
+        # Keep the line if it's not an error annotation
+        if not is_error_annotation:
+            result_lines.append(line)
+    
+    # Join the lines back together
+    result = '\n'.join(result_lines)
     
     # Clean up any empty lines created by removing annotations
     result = re.sub(r'\n\s*\n\s*\n', '\n\n', result)
