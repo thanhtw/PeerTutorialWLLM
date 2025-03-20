@@ -98,18 +98,32 @@ class JavaCodeReviewGraph:
                 self.code_evaluation_agent = None
     
     def _build_graph(self) -> StateGraph:
-        """Build the LangGraph workflow."""
+        """Build the LangGraph workflow with code evaluation and regeneration."""
         # Create a new graph with our state schema
         workflow = StateGraph(WorkflowState)
         
         # Define nodes
         workflow.add_node("generate_code", self.generate_code_node)
+        workflow.add_node("evaluate_code", self.evaluate_code_node)  # New node
+        workflow.add_node("regenerate_code", self.regenerate_code_node)  # New node
         workflow.add_node("review_code", self.review_code_node)
         workflow.add_node("analyze_review", self.analyze_review_node)
         workflow.add_node("generate_summary", self.generate_summary_node)
         
         # Define edges
-        workflow.add_edge("generate_code", "review_code")
+        workflow.add_edge("generate_code", "evaluate_code")  # First go to evaluation
+        workflow.add_edge("regenerate_code", "evaluate_code")  # Regeneration also goes to evaluation
+        
+        # Conditional edge based on evaluation result
+        workflow.add_conditional_edges(
+            "evaluate_code",
+            self.should_regenerate_or_review,
+            {
+                "regenerate_code": "regenerate_code",
+                "review_code": "review_code"
+            }
+        )
+        
         workflow.add_edge("review_code", "analyze_review")
         
         # Conditional edges from analyze_review
@@ -128,9 +142,6 @@ class JavaCodeReviewGraph:
         workflow.set_entry_point("generate_code")
         
         return workflow
-    
-    # Node implementations
-    # Update the generate_code_node method in langgraph_workflow.py
 
     def generate_code_node(self, state: WorkflowState) -> WorkflowState:
         """Generate Java code with errors node with enhanced debugging for all modes."""
@@ -139,6 +150,9 @@ class JavaCodeReviewGraph:
             code_length = state.code_length
             difficulty_level = state.difficulty_level
             selected_error_categories = state.selected_error_categories
+            state.evaluation_attempts = 0
+            state.evaluation_result = None
+            state.code_generation_feedback = None
             
             # Print the selected categories for debugging
             print("\n========== GENERATE_CODE_NODE ==========")
@@ -230,7 +244,6 @@ class JavaCodeReviewGraph:
             state.error = f"Error generating code: {str(e)}"
             return state
                 
-    
     # Update the generate_code_with_specific_errors method in langgraph_workflow.py
 
     def generate_code_with_specific_errors(self, state: WorkflowState, specific_errors: List[Dict[str, Any]]) -> WorkflowState:
@@ -450,9 +463,42 @@ class JavaCodeReviewGraph:
             return state
     
     # Conditional edge implementations
+    def should_regenerate_or_review(self, state: WorkflowState) -> str:
+        """
+        Determine if we should regenerate code or move to review.
+        This is used for the conditional edge from the evaluate_code node.
+        
+        Returns:
+            "regenerate_code" if we need to regenerate code based on evaluation feedback
+            "review_code" if the code is valid or we've reached max attempts
+        """
+        # Check if current step is explicitly set to regenerate
+        if state.current_step == "regenerate":
+            return "regenerate_code"
+        
+        # Check if evaluation passed
+        if state.evaluation_result and state.evaluation_result.get("valid", False):
+            return "review_code"
+        
+        # Check if we've reached max attempts
+        if hasattr(state, 'evaluation_attempts') and state.evaluation_attempts >= state.max_evaluation_attempts:
+            return "review_code"
+        
+        # Default to regenerate if we have an evaluation result but it's not valid
+        if state.evaluation_result:
+            return "regenerate_code"
+        
+        # If no evaluation result yet, move to review
+        return "review_code"
+    
     def should_continue_review(self, state: WorkflowState) -> str:
         """
         Determine if we should continue with another review iteration or generate summary.
+        This is used for the conditional edge from the analyze_review node.
+        
+        Returns:
+            "continue_review" if more review iterations are needed
+            "generate_summary" if the review is sufficient or max iterations reached
         """
         # Check if we've reached max iterations
         if state.current_iteration > state.max_iterations:
@@ -464,7 +510,7 @@ class JavaCodeReviewGraph:
         
         # Otherwise, continue reviewing
         return "continue_review"
-    
+
     def _generate_code_with_errors(self, code_length: str, difficulty_level: str, selected_errors: List[Dict[str, Any]]) -> Tuple[str, str, List[Dict[str, Any]], List[str]]:
         """
         Generate Java code with the selected errors, using the evaluation agent to ensure quality.
@@ -1129,3 +1175,187 @@ class JavaCodeReviewGraph:
     def reset(self) -> WorkflowState:
         """Reset the workflow to initial state."""
         return WorkflowState()
+    
+    def regenerate_code_node(self, state: WorkflowState) -> WorkflowState:
+        """
+        Regenerate code based on evaluation feedback.
+        Uses the feedback from code evaluation to improve code generation.
+        """
+        try:
+            logger.info(f"Starting code regeneration (Attempt {state.evaluation_attempts})")
+            
+            # Get parameters from state
+            code_length = state.code_length
+            difficulty_level = state.difficulty_level
+            selected_error_categories = state.selected_error_categories
+            
+            # Print regeneration info for debugging
+            print(f"\n========== REGENERATING CODE (Attempt {state.evaluation_attempts}) ==========")
+            print(f"Using feedback from evaluation to improve code generation")
+            
+            # Get errors from selected categories or use the ones from previous attempt
+            requested_errors = []
+            if hasattr(state.code_snippet, "raw_errors"):
+                for error_type in state.code_snippet.raw_errors:
+                    requested_errors.extend(state.code_snippet.raw_errors[error_type])
+            else:
+                # Fallback to getting errors from categories if raw_errors not available
+                selected_errors, _ = self.error_repository.get_errors_for_llm(
+                    selected_categories=selected_error_categories,
+                    count=get_error_count_for_difficulty(difficulty_level),
+                    difficulty=difficulty_level
+                )
+                requested_errors = selected_errors
+            
+            # Use the code generation feedback to generate improved code
+            feedback_prompt = state.code_generation_feedback
+            
+            # Log the prompt for debugging
+            print("\n========== REGENERATION PROMPT ==========")
+            print(feedback_prompt[:500] + "..." if len(feedback_prompt) > 500 else feedback_prompt)
+            
+            # Generate code with feedback prompt
+            if hasattr(self.code_generator, 'llm') and self.code_generator.llm:
+                response = self.code_generator.llm.invoke(feedback_prompt)
+                
+                # Extract the code with annotations
+                annotated_code = extract_code_from_response(response)
+                
+                # Create clean version by stripping annotations
+                clean_code = strip_error_annotations(annotated_code)
+                
+                # Enrich the error information 
+                enhanced_errors, detailed_problems = enrich_error_information(
+                    clean_code, requested_errors
+                )
+                
+                # Create updated code snippet
+                state.code_snippet = CodeSnippet(
+                    code=annotated_code,
+                    clean_code=clean_code,
+                    known_problems=detailed_problems,
+                    raw_errors={
+                        "build": [e for e in requested_errors if e.get("type") == "build"],
+                        "checkstyle": [e for e in requested_errors if e.get("type") == "checkstyle"]
+                    },
+                    enhanced_errors=enhanced_errors
+                )
+                
+                # Move to evaluation step again
+                state.current_step = "evaluate"
+                logger.info(f"Code regenerated successfully on attempt {state.evaluation_attempts}")
+                
+                return state
+            else:
+                # If no LLM available, fall back to standard generation
+                logger.warning("No LLM available for regeneration. Falling back to standard generation.")
+                return self.generate_code_node(state)
+                
+        except Exception as e:
+            logger.error(f"Error regenerating code: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            state.error = f"Error regenerating code: {str(e)}"
+            return state
+        
+    def evaluate_code_node(self, state: WorkflowState) -> WorkflowState:
+        """
+        Evaluate generated code to ensure it contains the requested errors.
+        Acts as a dedicated node in the LangGraph workflow.
+        """
+        try:
+            logger.info("Starting code evaluation node")
+            
+            # Get code snippet from state
+            if not state.code_snippet:
+                state.error = "No code snippet available for evaluation"
+                return state
+                
+            # Get the clean code (without annotations)
+            code = state.code_snippet.clean_code
+            
+            # Get requested errors from state
+            requested_errors = []
+            if hasattr(state.code_snippet, "raw_errors"):
+                for error_type in state.code_snippet.raw_errors:
+                    requested_errors.extend(state.code_snippet.raw_errors[error_type])
+            
+            # Initialize the evaluation agent if not already done
+            if not hasattr(self, 'code_evaluation_agent') or self.code_evaluation_agent is None:
+                try:
+                    from utils.code_evaluation_agent import CodeEvaluationAgent
+                    self.code_evaluation_agent = CodeEvaluationAgent()
+                    logger.info("Created Code Evaluation Agent for evaluation node")
+                except Exception as e:
+                    logger.error(f"Error initializing Code Evaluation Agent: {str(e)}")
+                    state.error = f"Error initializing Code Evaluation Agent: {str(e)}"
+                    return state
+            
+            # Evaluate the code
+            evaluation_result = self.code_evaluation_agent.evaluate_code(
+                code, requested_errors
+            )
+            
+            # Update state with evaluation results
+            state.evaluation_result = evaluation_result
+            state.evaluation_attempts += 1
+            
+            # Log evaluation results
+            logger.info(f"Code evaluation complete: {len(evaluation_result.get('found_errors', []))} " +
+                    f"of {len(requested_errors)} errors implemented")
+            
+            # If evaluation passed (all errors implemented), move to review
+            if evaluation_result["valid"]:
+                state.current_step = "review"
+                logger.info("All errors successfully implemented, proceeding to review")
+            else:
+                # Generate feedback for code regeneration
+                feedback = self.code_evaluation_agent.generate_improved_prompt(
+                    code, requested_errors, evaluation_result
+                )
+                state.code_generation_feedback = feedback
+                
+                # Check if we've reached max attempts
+                if state.evaluation_attempts >= state.max_evaluation_attempts:
+                    # If we've reached max attempts, proceed to review anyway
+                    state.current_step = "review"
+                    logger.warning(f"Reached maximum evaluation attempts ({state.max_evaluation_attempts}). Proceeding to review.")
+                else:
+                    # Otherwise, set the step to regenerate code
+                    state.current_step = "regenerate"
+                    logger.info(f"Evaluation attempt {state.evaluation_attempts}: Feedback generated for regeneration")
+            
+            return state
+            
+        except Exception as e:
+            logger.error(f"Error evaluating code: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            state.error = f"Error evaluating code: {str(e)}"
+            return state
+        
+    def debug_state(state: WorkflowState):
+        """Print detailed debug info about the current state"""
+        print("\n========== STATE DEBUG ==========")
+        print(f"Current step: {state.current_step}")
+        print(f"Error: {state.error}")
+        print(f"Current iteration: {state.current_iteration}")
+        print(f"Max iterations: {state.max_iterations}")
+        print(f"Review sufficient: {state.review_sufficient}")
+        
+        if hasattr(state, 'code_snippet') and state.code_snippet:
+            print("Code snippet: Present")
+            print(f"  Code length: {len(state.code_snippet.code) if hasattr(state.code_snippet, 'code') else 'N/A'}")
+            print(f"  Clean code length: {len(state.code_snippet.clean_code) if hasattr(state.code_snippet, 'clean_code') else 'N/A'}")
+            print(f"  Known problems: {len(state.code_snippet.known_problems) if hasattr(state.code_snippet, 'known_problems') else 'N/A'}")
+        else:
+            print("Code snippet: Missing")
+        
+        if hasattr(state, 'evaluation_result') and state.evaluation_result:
+            print("Evaluation result: Present")
+            print(f"  Found errors: {len(state.evaluation_result.get('found_errors', []))}")
+            print(f"  Missing errors: {len(state.evaluation_result.get('missing_errors', []))}")
+        else:
+            print("Evaluation result: Missing")
+        
+        print("================================")

@@ -349,9 +349,10 @@ if (s1 == s2) { // Using == instead of equals()
         return class_bodies
     
     def generate_improved_prompt(self, code: str, requested_errors: List[Dict[str, Any]], 
-                               evaluation: Dict[str, Any]) -> str:
+                           evaluation: Dict[str, Any]) -> str:
         """
         Generate an improved prompt for the code generator based on evaluation.
+        Enhanced with clearer feedback and specific guidance for missing errors.
         
         Args:
             code: The previously generated code
@@ -377,11 +378,26 @@ if (s1 == s2) { // Using == instead of equals()
         )
         
         # Add specific guidance based on evaluation
-        prompt += "\n\nYOUR PREVIOUS CODE HAD THESE ISSUES:\n"
+        prompt += "\n\n## FEEDBACK ON PREVIOUS CODE GENERATION ATTEMPT\n"
+        
+        if evaluation["found_errors"]:
+            prompt += "\n### What was implemented correctly:\n"
+            for error_key in evaluation["found_errors"]:
+                prompt += f"- ✅ {error_key}\n"
+                    
+                # Include the exact line where the error was found, if available
+                line_num = evaluation["error_locations"].get(error_key, 0)
+                if line_num > 0:
+                    lines = code.splitlines()
+                    line_content = lines[line_num-1] if 0 < line_num <= len(lines) else "Unknown"
+                    prompt += f"  Found at line {line_num}: `{line_content.strip()}`\n"
         
         if evaluation["missing_errors"]:
-            prompt += "\nYou need to implement these specific errors that were missing:\n"
+            prompt += "\n### Errors that need to be implemented:\n"
+            
             for error_key in evaluation["missing_errors"]:
+                prompt += f"- ❌ {error_key}\n"
+                
                 # Find the corresponding error details
                 for error in requested_errors:
                     if f"{error.get('type', '').upper()} - {error.get('name', '')}" == error_key:
@@ -390,36 +406,27 @@ if (s1 == s2) { // Using == instead of equals()
                         description = error.get("description", "")
                         implementation_guide = error.get("implementation_guide", "")
                         
-                        prompt += f"\n{error_type} - {name}:\n"
-                        prompt += f"Description: {description}\n"
-                        prompt += f"Implementation guide: {implementation_guide}\n"
+                        prompt += f"  Description: {description}\n"
+                        prompt += f"  Implementation guide: {implementation_guide}\n\n"
                         
                         # Add specific suggestions from the evaluation
-                        for suggestion in evaluation["suggestions"]:
-                            if suggestion["error_key"] == error_key:
-                                for tip in suggestion["suggestions"]:
-                                    prompt += f"Suggestion: {tip}\n"
+                        for suggestion in evaluation.get("suggestions", []):
+                            if suggestion.get("error_key") == error_key:
+                                for tip in suggestion.get("suggestions", []):
+                                    prompt += f"  Suggestion: {tip}\n"
                                 if "sample_code" in suggestion:
-                                    prompt += f"Sample code: {suggestion['sample_code']}\n"
+                                    prompt += f"  Sample code: `{suggestion['sample_code']}`\n\n"
         
-        # If there were correctly implemented errors, acknowledge them
-        if evaluation["found_errors"]:
-            prompt += "\nThe following errors were correctly implemented and should be kept:\n"
-            for error_key in evaluation["found_errors"]:
-                prompt += f"- {error_key}\n"
-                
-                # Include the exact line where the error was found, if available
-                line_num = evaluation["error_locations"].get(error_key, 0)
-                if line_num > 0:
-                    lines = code.splitlines()
-                    line_content = lines[line_num-1] if 0 < line_num <= len(lines) else "Unknown"
-                    prompt += f"  Found at line {line_num}: {line_content.strip()}\n"
+        prompt += "\n## SPECIFIC INSTRUCTIONS FOR THIS ATTEMPT\n"
+        prompt += "\n1. Please revise the code to implement ALL requested errors. Be sure to follow the implementation guides."
+        prompt += "\n2. Make sure to add error annotations in the standard format: `// ERROR: [TYPE] - [NAME] - [Brief explanation]`"
+        prompt += "\n3. Keep your correct implementations from the previous attempt while adding the missing errors."
+        prompt += "\n4. Focus especially on implementing the missing errors highlighted above."
+        prompt += "\n5. Return your final code in a code block with ``` delimiters."
         
-        prompt += "\nPlease revise the code to implement ALL requested errors. Be sure to follow the implementation guides."
-        prompt += "\nMake sure to add error annotations in the standard format: // ERROR: [TYPE] - [NAME] - [Brief explanation]"
-        
-        # Add a note about keeping good implementations
-        prompt += "\n\nIMPORTANT: Keep your correct implementations from the previous attempt while adding the missing errors."
+        prompt += "\n\nHere's the previous code to improve upon:\n\n```java\n"
+        prompt += code
+        prompt += "\n```"
         
         return prompt
     

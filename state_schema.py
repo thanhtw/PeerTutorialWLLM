@@ -11,6 +11,8 @@ from pydantic import BaseModel, Field
 
 # Update the CodeSnippet class in state_schema.py
 
+
+
 class CodeSnippet(BaseModel):
     """Schema for code snippet data"""
     code: str = Field(description="The Java code snippet with annotations")
@@ -59,3 +61,11 @@ class WorkflowState(BaseModel):
     
     # Error handling
     error: Optional[str] = Field(None, description="Error message if any")
+
+    evaluation_result: Optional[Dict[str, Any]] = Field(None, description="Results from code evaluation")
+
+    evaluation_attempts: int = Field(0, description="Number of attempts to generate code")
+
+    max_evaluation_attempts: int = Field(3, description="Maximum number of code generation attempts")
+
+    code_generation_feedback: Optional[str] = Field(None, description="Feedback for code generation")

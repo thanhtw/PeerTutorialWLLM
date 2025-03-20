@@ -91,126 +91,169 @@ def generate_code_problem(workflow: JavaCodeReviewGraph,
                          error_selection_mode: str,
                          selected_error_categories: Dict[str, List[str]],
                          selected_specific_errors: List[Dict[str, Any]] = None):
-    """
-    Generate a code problem with progress indicator and enhanced error debugging.
-    """
-    # Show progress during generation
-    with st.status("Generating Java code problem...", expanded=True) as status:
-        try:
-            status.update(label="Preparing parameters...", state="running", expanded=True)
-            
-            # Update workflow state with generation parameters
-            state = st.session_state.workflow_state
-            
-            # Ensure code_length and difficulty_level are strings
-            code_length = str(params.get("code_length", "medium"))
-            difficulty_level = str(params.get("difficulty_level", "medium"))
-            
-            state.code_length = code_length
-            state.difficulty_level = difficulty_level
-            
-            # Debug print current state before updating
-            print("\n========== GENERATE_CODE_PROBLEM FUNCTION ==========")
-            print(f"UI Selected Categories: {selected_error_categories}")
-            print(f"UI Selected Specific Errors: {len(selected_specific_errors) if selected_specific_errors else 0}")
-            print(f"Mode: {error_selection_mode}")
-            
-            # Explicitly ensure we have some error selections based on the mode
-            has_selections = False
-            
+    """Generate a code problem with progress indicator and evaluation visualization."""
+    try:
+        # Initialize state and parameters
+        state = st.session_state.workflow_state
+        code_length = str(params.get("code_length", "medium"))
+        difficulty_level = str(params.get("difficulty_level", "medium"))
+        state.code_length = code_length
+        state.difficulty_level = difficulty_level
+        
+        # Verify we have error selections
+        has_selections = False
+        if error_selection_mode == "specific" and selected_specific_errors:
+            has_selections = len(selected_specific_errors) > 0
+        elif error_selection_mode == "standard" or error_selection_mode == "advanced":
+            build_selected = selected_error_categories.get("build", [])
+            checkstyle_selected = selected_error_categories.get("checkstyle", [])
+            has_selections = len(build_selected) > 0 or len(checkstyle_selected) > 0
+        
+        if not has_selections:
+            st.error("No error categories or specific errors selected. Please select at least one error type.")
+            return False
+        
+        # Update the state with selected error categories
+        state.selected_error_categories = selected_error_categories
+        
+        # First stage: Generate initial code
+        with st.status("Generating initial Java code...", expanded=True) as status:
             if error_selection_mode == "specific" and selected_specific_errors:
-                # Specific errors mode
-                has_selections = len(selected_specific_errors) > 0
-                print(f"Specific mode has selections: {has_selections}")
-                
-            elif error_selection_mode == "standard" or error_selection_mode == "advanced":
-                # Category-based selection modes
-                build_selected = selected_error_categories.get("build", [])
-                checkstyle_selected = selected_error_categories.get("checkstyle", [])
-                has_selections = len(build_selected) > 0 or len(checkstyle_selected) > 0
-                print(f"Category mode has selections: {has_selections} (Build: {len(build_selected)}, Checkstyle: {len(checkstyle_selected)})")
-            
-            # If no selections were made, show error and return
-            if not has_selections:
-                error_msg = "No error categories or specific errors selected. Please select at least one error type."
-                status.update(label=f"Error: {error_msg}", state="error")
-                st.session_state.error = error_msg
-                return False
-            
-            # Update the state with selected error categories
-            # Use only the properly named field without underscore
-            state.selected_error_categories = selected_error_categories
-            
-            print(f"Updated state with categories: {state.selected_error_categories}")
-            
-            # ENHANCED DEBUGGING: Pre-calculate what errors will be selected to show before generation
-            if error_selection_mode != "specific":
-                # This will show you what actual errors are selected from categories before generation
-                from data.json_error_repository import JsonErrorRepository
-                error_repo = JsonErrorRepository()
-                error_count = {
-                    "easy": 2,
-                    "medium": 4,
-                    "hard": 6
-                }.get(difficulty_level.lower(), 4)
-                
-                # Get the actual errors that would be selected for these categories
-                preview_errors, _ = error_repo.get_errors_for_llm(
-                    selected_categories=selected_error_categories,
-                    count=error_count,
-                    difficulty=difficulty_level
-                )
-                
-                print("\n========== PREVIEW OF ERRORS TO BE SENT TO LLM ==========")
-                print(f"The following {len(preview_errors)} errors will be used for code generation:")
-                for i, error in enumerate(preview_errors, 1):
-                    error_type = error.get("type", "Unknown")
-                    name = error.get("name", "Unknown")
-                    category = error.get("category", "Unknown")
-                    print(f"  {i}. {error_type} - {name} (from {category})")
-                    
-                    # FIXED: Proper handling of implementation guide
-                    if "implementation_guide" in error:
-                        implementation_guide = error.get('implementation_guide', '')
-                        if len(implementation_guide) > 100:
-                            print(f"     Implementation: {implementation_guide[:100]}...")
-                        else:
-                            print(f"     Implementation: {implementation_guide}")
-                
-                print("=================================================")
-            
-            # Run the generation node with appropriate error selection
-            status.update(label="Generating code with errors...", state="running")
-            
-            if error_selection_mode == "specific" and selected_specific_errors:
-                # Use specific errors for generation
-                updated_state = workflow.generate_code_with_specific_errors(
-                    state, 
-                    selected_specific_errors
-                )
+                updated_state = workflow.generate_code_with_specific_errors(state, selected_specific_errors)
             else:
-                # Use category-based error selection
                 updated_state = workflow.generate_code_node(state)
             
-            # Check for errors
             if updated_state.error:
-                status.update(label=f"Error: {updated_state.error}", state="error")
-                st.session_state.error = updated_state.error
+                st.error(f"Error: {updated_state.error}")
                 return False
+        
+        # Second stage: Display the evaluation process
+        st.info("Evaluating and improving the code...")
+        
+        # Create a process visualization using columns and containers instead of expanders
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            st.subheader("Code Generation & Evaluation Process")
             
-            # Update session state
-            st.session_state.workflow_state = updated_state
-            st.session_state.active_tab = 1  # Move to the review tab
-            st.session_state.error = None
+            # Create a progress container
+            progress_container = st.container()
+            with progress_container:
+                # Create a progress bar
+                progress_bar = st.progress(0.25)
+                st.write("**Step 1:** Initial code generation completed")
+                
+                # Evaluate the code
+                with st.status("Evaluating code quality...", expanded=False):
+                    updated_state = workflow.evaluate_code_node(updated_state)
+                
+                progress_bar.progress(0.5)
+                st.write("**Step 2:** Code evaluation completed")
+                
+                # Show evaluation results
+                if hasattr(updated_state, 'evaluation_result') and updated_state.evaluation_result:
+                    found = len(updated_state.evaluation_result.get("found_errors", []))
+                    missing = len(updated_state.evaluation_result.get("missing_errors", []))
+                    total = found + missing
+                    if total == 0:
+                        total = 1  # Avoid division by zero
+                    
+                    quality_percentage = (found / total * 100)
+                    st.write(f"**Initial quality:** Found {found}/{total} required errors ({quality_percentage:.1f}%)")
+                    
+                    # Regeneration cycle if needed
+                    if missing > 0 and updated_state.current_step == "regenerate":
+                        st.write("**Step 3:** Improving code quality")
+                        
+                        attempt = 1
+                        max_attempts = getattr(updated_state, 'max_evaluation_attempts', 3)
+                        previous_found = found
+                        
+                        # Loop through regeneration attempts
+                        while (getattr(updated_state, 'current_step', None) == "regenerate" and 
+                              attempt < max_attempts):
+                            progress_value = 0.5 + (0.5 * (attempt / max_attempts))
+                            progress_bar.progress(progress_value)
+                            
+                            # Regenerate code
+                            with st.status(f"Regenerating code (Attempt {attempt+1})...", expanded=False):
+                                updated_state = workflow.regenerate_code_node(updated_state)
+                            
+                            # Re-evaluate code
+                            with st.status(f"Re-evaluating code...", expanded=False):
+                                updated_state = workflow.evaluate_code_node(updated_state)
+                            
+                            # Show updated results
+                            if hasattr(updated_state, 'evaluation_result'):
+                                new_found = len(updated_state.evaluation_result.get("found_errors", []))
+                                new_missing = len(updated_state.evaluation_result.get("missing_errors", []))
+                                
+                                st.write(f"**Quality after attempt {attempt+1}:** Found {new_found}/{total} required errors " +
+                                      f"({new_found/total*100:.1f}%)")
+                                
+                                if new_found > previous_found:
+                                    st.success(f"✅ Added {new_found - previous_found} new errors in this attempt!")
+                                    
+                                previous_found = new_found
+                            
+                            attempt += 1
+                    
+                    # Complete the progress
+                    progress_bar.progress(1.0)
+                    
+                    # Show final outcome
+                    if quality_percentage == 100:
+                        st.success("✅ All requested errors successfully implemented!")
+                    elif quality_percentage >= 80:
+                        st.success(f"✅ Good quality code generated with {quality_percentage:.1f}% of requested errors!")
+                    else:
+                        st.warning(f"⚠️ Code generated with {quality_percentage:.1f}% of requested errors. " +
+                                "Some errors could not be implemented but the code is still suitable for review practice.")
+                
+        with col2:
+            # Show statistics in the sidebar
+            st.subheader("Generation Stats")
             
-            status.update(label="Code generated successfully!", state="complete")
-            return True
+            if hasattr(updated_state, 'evaluation_result') and updated_state.evaluation_result:
+                found = len(updated_state.evaluation_result.get("found_errors", []))
+                missing = len(updated_state.evaluation_result.get("missing_errors", []))
+                total = found + missing
+                if total > 0:
+                    quality_percentage = (found / total * 100)
+                    st.metric("Quality", f"{quality_percentage:.1f}%")
+                
+                st.metric("Errors Found", f"{found}/{total}")
+                
+                if hasattr(updated_state, 'evaluation_attempts'):
+                    st.metric("Generation Attempts", updated_state.evaluation_attempts)
+        
+        # Update session state
+        st.session_state.workflow_state = updated_state
+        st.session_state.active_tab = 1  # Move to the review tab
+        st.session_state.error = None
+        
+        # Debug output
+        if hasattr(updated_state, 'code_snippet') and updated_state.code_snippet:
+            # Also show the generated code in this tab for immediate feedback
+            st.subheader("Generated Java Code")
             
-        except Exception as e:
-            logger.error(f"Error generating code problem: {str(e)}")
-            status.update(label=f"Error: {str(e)}", state="error")
-            st.session_state.error = f"Error generating code problem: {str(e)}"
-            return False
+            code_to_display = None
+            if hasattr(updated_state.code_snippet, 'clean_code') and updated_state.code_snippet.clean_code:
+                code_to_display = updated_state.code_snippet.clean_code
+            elif hasattr(updated_state.code_snippet, 'code') and updated_state.code_snippet.code:
+                code_to_display = updated_state.code_snippet.code
+                
+            if code_to_display:
+                st.code(code_to_display, language="java")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error generating code problem: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        st.error(f"Error generating code problem: {str(e)}")
+        return False
 
 def process_student_review(workflow: JavaCodeReviewGraph, student_review: str):
     """
@@ -351,8 +394,6 @@ def render_sidebar(llm_manager: LLMManager, workflow: JavaCodeReviewGraph):
                 
                 # Show reinitializing message
                 st.info("Model selections changed. Reinitializing models...")
-
-
 
 def render_status_sidebar(llm_manager: LLMManager):
     """Render the status sidebar tab with GPU information and model details."""
@@ -561,7 +602,6 @@ def render_status_sidebar(llm_manager: LLMManager):
         '</div>',
         unsafe_allow_html=True
     )
-
 
 def render_settings_sidebar(workflow: JavaCodeReviewGraph):
     """Render the settings sidebar tab"""
@@ -787,13 +827,59 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui):
         if success:
             st.rerun()
     
-    # Display existing code if available
-    state = st.session_state.workflow_state
-    if state.code_snippet:
-        code_display_ui.render_code_display(
-            state.code_snippet.code,
-            state.code_snippet.known_problems if st.session_state.get("instructor_view", False) else None
-        )
+    # IMPORTANT: Initialize state here before trying to use it
+    # Make sure state is defined before checking for code_snippet
+    if 'workflow_state' in st.session_state:
+        state = st.session_state.workflow_state
+        
+        # Now proceed with displaying code if available
+        if hasattr(state, 'code_snippet') and state.code_snippet:
+            # DEBUGGING CODE DISPLAY
+            st.subheader("DEBUG: Code Inspection")
+            st.write(f"Has code_snippet: {state.code_snippet is not None}")
+            
+            if state.code_snippet:
+                # Display the content of code_snippet to aid debugging
+                st.write(f"Code length: {len(state.code_snippet.code or '') if hasattr(state.code_snippet, 'code') else 'N/A'}")
+                st.write(f"Clean code length: {len(state.code_snippet.clean_code or '') if hasattr(state.code_snippet, 'clean_code') else 'N/A'}")
+                st.write(f"Known problems: {len(state.code_snippet.known_problems or []) if hasattr(state.code_snippet, 'known_problems') else 'N/A'}")
+                
+                # Display evaluation info if available
+                if hasattr(state, 'evaluation_result') and state.evaluation_result:
+                    found = len(state.evaluation_result.get("found_errors", []))
+                    missing = len(state.evaluation_result.get("missing_errors", []))
+                    total = found + missing if found + missing > 0 else 1
+                    quality_percentage = (found / total * 100)
+                    
+                    st.write(f"Evaluation: {found}/{total} errors ({quality_percentage:.1f}%)")
+            
+            # FORCE direct display of code
+            st.subheader("Java Code for Review")
+            if hasattr(state.code_snippet, 'code') and state.code_snippet.code:
+                st.code(state.code_snippet.code, language="java")
+            elif hasattr(state.code_snippet, 'clean_code') and state.code_snippet.clean_code:
+                st.code(state.code_snippet.clean_code, language="java")
+            else:
+                st.warning("Code snippet exists but no code is available")
+            
+            # Also try using the display UI component
+            try:
+                code_to_display = None
+                if hasattr(state.code_snippet, 'clean_code') and state.code_snippet.clean_code:
+                    code_to_display = state.code_snippet.clean_code
+                elif hasattr(state.code_snippet, 'code') and state.code_snippet.code:
+                    code_to_display = state.code_snippet.code
+                    
+                if code_to_display:
+                    st.subheader("Java Code (using UI Component)")
+                    code_display_ui.render_code_display(
+                        code_to_display,
+                        state.code_snippet.known_problems if st.session_state.get("instructor_view", False) else None
+                    )
+            except Exception as e:
+                st.error(f"Error displaying code with UI component: {str(e)}")
+    else:
+        st.info("No code generated yet. Select error types and click 'Generate Code Problem' to create a Java code snippet.")
 
 def render_review_tab(workflow, code_display_ui):
     """Render the review submission tab with enhanced UI."""
