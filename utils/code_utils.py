@@ -51,27 +51,8 @@ def create_code_generation_prompt(
         "short": "1 class with 2-4 methods and fields",
         "medium": "1 class with 4-6 methods, may include nested classes",
         "long": "2-3 classes with 5-10 methods and proper class relationships"
-    }.get(code_length_str.lower(), "1 class with 4-6 methods")
+    }.get(code_length_str.lower(), "1 class with 4-6 methods")    
     
-    # If no errors specified or empty list, create a clean code prompt
-    if not selected_errors or len(selected_errors) == 0:
-        prompt = f"""
-You are a Java programming expert. Create a realistic, working Java code snippet for a {domain} system.
-The code should be {code_length} in length and {difficulty_level} in complexity.
-
-Requirements:
-- Create approximately {complexity_profile}
-- Include appropriate comments and documentation
-- Follow standard Java naming conventions and best practices
-- Make the code realistic and representative of real-world Java applications
-- PLS include intentional errors
-
-Return only the Java code with no additional explanations.
-```java
-// Your code here
-```
-"""
-        return prompt
     
     # Create error instructions with standardized format
     error_instructions = ""
@@ -120,10 +101,8 @@ ERROR IMPLEMENTATION EXAMPLES:
 
 IMPORTANT: DO NOT just write correct code with error annotations. You MUST actually introduce the specified errors into the code itself.
 """
-    
-    # Create the appropriate prompt
-    if reasoning_mode:
-        prompt = f"""You are an expert Java programming educator who creates code review exercises with intentional errors.
+     
+    prompt = f"""You are an expert Java programming educator who creates code review exercises with intentional errors.
 
 Please create a {code_length} Java code example for a {domain} system with {complexity_profile}.
 The code should be realistic, well-structured, and MUST CONTAIN the following specific errors:
@@ -146,29 +125,8 @@ Requirements:
 4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
 5. Return your final code in a code block with ``` delimiters
 
-I'll now create the Java code with the required errors:
-"""
-    else:
-        prompt = f"""You are an expert Java programming educator who creates code review exercises with intentional errors.
-
-Please create a {code_length} Java code example for a {domain} system with {complexity_profile}.
-The code should be realistic, well-structured, and MUST CONTAIN the following specific errors:
-
-{error_instructions}
-
-{error_examples}
-
-Requirements:
-1. Write a complete, compilable Java code (except for the intentional errors)
-2. Make the code realistic and representative of actual Java applications
-3. ACTUALLY IMPLEMENT the errors in the code according to their implementation guides{annotation_instruction}
-4. The difficulty level should be {difficulty_level}, appropriate for students learning Java
-5. Return your final code in a code block with ``` delimiters
-
-IMPORTANT: You MUST actually introduce these errors into the code, not just add annotations. For example, if an error is about "Cannot find symbol", use a variable that hasn't been defined. If it's about naming conventions, use names that violate the conventions.
-
-Return ONLY the Java code with the errors included. Do not include any explanations or JSON formatting.
-"""
+I'll now create the Java code with the required errors:"""
+    
     
     return prompt
 

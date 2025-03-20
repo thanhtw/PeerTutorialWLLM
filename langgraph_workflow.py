@@ -73,11 +73,29 @@ class JavaCodeReviewGraph:
             self.code_generator = CodeGenerator(generative_model) if generative_model else CodeGenerator()
             self.evaluator = StudentResponseEvaluator(review_model) if review_model else StudentResponseEvaluator()
             self.feedback_manager = FeedbackManager(self.evaluator)
+            
+            # Initialize the new code evaluation agent
+            try:
+                from utils.code_evaluation_agent import CodeEvaluationAgent
+                self.code_evaluation_agent = CodeEvaluationAgent()
+                logger.info("Successfully initialized Code Evaluation Agent")
+            except Exception as e:
+                logger.error(f"Error initializing Code Evaluation Agent: {str(e)}")
+                self.code_evaluation_agent = None
         else:
             # Initialize domain objects without LLMs
             self.code_generator = CodeGenerator()
             self.evaluator = StudentResponseEvaluator()
             self.feedback_manager = FeedbackManager(self.evaluator)
+            
+            # Initialize the new code evaluation agent without LLM
+            try:
+                from utils.code_evaluation_agent import CodeEvaluationAgent
+                self.code_evaluation_agent = CodeEvaluationAgent()
+                logger.info("Successfully initialized Code Evaluation Agent (without LLM)")
+            except Exception as e:
+                logger.error(f"Error initializing Code Evaluation Agent: {str(e)}")
+                self.code_evaluation_agent = None
     
     def _build_graph(self) -> StateGraph:
         """Build the LangGraph workflow."""
@@ -231,6 +249,15 @@ class JavaCodeReviewGraph:
             for i, error in enumerate(specific_errors):
                 print(f"  {i+1}. {error.get('type', 'Unknown')} - {error.get('name', 'Unknown')} ({error.get('category', 'Unknown')})")
             
+            # Initialize the evaluation agent if not already done
+            if not hasattr(self, 'code_evaluation_agent') or self.code_evaluation_agent is None:
+                try:
+                    from utils.code_evaluation_agent import CodeEvaluationAgent
+                    self.code_evaluation_agent = CodeEvaluationAgent()
+                    logger.info("Created Code Evaluation Agent for specific errors mode")
+                except Exception as e:
+                    logger.error(f"Error initializing Code Evaluation Agent: {str(e)}")
+            
             # Format problem descriptions
             problem_descriptions = []
             for error in specific_errors:
@@ -244,7 +271,7 @@ class JavaCodeReviewGraph:
                 else:  # checkstyle
                     problem_descriptions.append(f"Checkstyle Error - {name}: {description} (Category: {category})")
             
-            # Generate code with selected errors - now returns both versions
+            # Generate code with selected errors - now uses the enhanced method with evaluation agent
             annotated_code, clean_code, enhanced_errors, detailed_problems = self._generate_code_with_errors(
                 code_length=code_length,
                 difficulty_level=difficulty_level,
@@ -438,16 +465,9 @@ class JavaCodeReviewGraph:
         # Otherwise, continue reviewing
         return "continue_review"
     
-    # Helper methods
-    # Replace the _generate_code_with_errors method in langgraph_workflow.py
-
-    # In langgraph_workflow.py, update the _generate_code_with_errors method:
-
-    # In langgraph_workflow.py, update the _generate_code_with_errors method to ensure clean code is properly cleaned:
-
     def _generate_code_with_errors(self, code_length: str, difficulty_level: str, selected_errors: List[Dict[str, Any]]) -> Tuple[str, str, List[Dict[str, Any]], List[str]]:
         """
-        Generate Java code with the selected errors, returning both annotated and clean versions.
+        Generate Java code with the selected errors, using the evaluation agent to ensure quality.
         
         Args:
             code_length: Length of code (short, medium, long)
@@ -457,13 +477,59 @@ class JavaCodeReviewGraph:
         Returns:
             Tuple of (annotated_code, clean_code, enhanced_errors, detailed_problems)
         """
+        # Import the CodeEvaluationAgent
+        from utils.code_evaluation_agent import CodeEvaluationAgent
+        # Import the validation function
+        from utils.error_validation import validate_code_errors
+        
+        # Initialize the evaluation agent if not already done
+        if not hasattr(self, 'code_evaluation_agent') or self.code_evaluation_agent is None:
+            try:
+                self.code_evaluation_agent = CodeEvaluationAgent()
+                logger.info("Created Code Evaluation Agent for error detection")
+            except Exception as e:
+                logger.error(f"Error initializing Code Evaluation Agent: {str(e)}")
+                self.code_evaluation_agent = None
+        
+        # Use the local variable for clarity
+        evaluation_agent = self.code_evaluation_agent
+        
+        # Validate we have proper error information
+        if not selected_errors:
+            logger.warning("No errors specified for code generation")
+            selected_errors = []
+        
+        # Ensure all errors have the minimal required fields
+        normalized_errors = []
+        for error in selected_errors:
+            normalized = error.copy()
+            if "type" not in normalized and "category" in normalized:
+                # Try to infer type from category
+                category = normalized["category"].lower()
+                if any(cat in category for cat in ["compile", "runtime", "logical", "warning"]):
+                    normalized["type"] = "build"
+                else:
+                    normalized["type"] = "checkstyle"
+            
+            if "name" not in normalized:
+                if "check_name" in normalized:
+                    normalized["name"] = normalized["check_name"]
+                elif "error_name" in normalized:
+                    normalized["name"] = normalized["error_name"]
+            
+            # Ensure we have a description
+            if "description" not in normalized:
+                normalized["description"] = f"{normalized.get('type', 'Error')} of type {normalized.get('name', 'unknown')}"
+            
+            normalized_errors.append(normalized)
+        
+        # Use enhanced errors for generation
+        selected_errors = normalized_errors
+        
         # Use the code generator to create code with errors
         if hasattr(self.code_generator, 'llm') and self.code_generator.llm:
-            # Import the validation function
-            from utils.error_validation import validate_code_errors
-        
             # Track attempts to generate proper code with errors
-            max_attempts = 3
+            max_attempts = 5  # Increased to 5 for more thorough attempts
             current_attempt = 0
             best_code = None
             best_validation = None
@@ -471,13 +537,54 @@ class JavaCodeReviewGraph:
             while current_attempt < max_attempts:
                 current_attempt += 1
                 
-                # Create a detailed prompt for the LLM
-                prompt = create_code_generation_prompt(
-                    code_length=code_length,
-                    difficulty_level=difficulty_level,
-                    selected_errors=selected_errors,
-                    include_error_annotations=True  # Generate code with annotations
-                )
+                # Create a detailed prompt for the LLM - use improved prompt after first attempt
+                if current_attempt == 1 or best_code is None:
+                    prompt = create_code_generation_prompt(
+                        code_length=code_length,
+                        difficulty_level=difficulty_level,
+                        selected_errors=selected_errors,
+                        include_error_annotations=True  # Generate code with annotations
+                    )
+                else:
+                    # Use evaluation agent to create an improved prompt based on previous attempt
+                    try:
+                        if evaluation_agent:
+                            evaluation = evaluation_agent.evaluate_code(
+                                best_code[1],  # Use the clean code from best attempt
+                                selected_errors
+                            )
+                            
+                            prompt = evaluation_agent.generate_improved_prompt(
+                                best_code[1],  # Use the clean code from best attempt
+                                selected_errors,
+                                evaluation
+                            )
+                        else:
+                            # Fallback if no evaluation agent
+                            prompt = create_code_generation_prompt(
+                                code_length=code_length,
+                                difficulty_level=difficulty_level,
+                                selected_errors=selected_errors,
+                                include_error_annotations=True
+                            )
+                            prompt += f"\n\nPrevious attempt failed to implement all errors. Please try again with attempt {current_attempt}."
+                    except Exception as e:
+                        logger.error(f"Error generating improved prompt: {str(e)}")
+                        # Fall back to standard prompt
+                        prompt = create_code_generation_prompt(
+                            code_length=code_length,
+                            difficulty_level=difficulty_level,
+                            selected_errors=selected_errors,
+                            include_error_annotations=True
+                        )
+                        prompt += f"\n\nPrevious attempt failed to implement all errors. Please try again and ensure ALL requested errors are implemented."
+                        
+                        # Add emphasis on adding ALL requested errors
+                        prompt += "\n\nMAKE SURE to implement ALL of the following errors:"
+                        for error in selected_errors:
+                            error_type = error.get("type", "").upper()
+                            name = error.get("name", "")
+                            prompt += f"\n- {error_type} - {name}"
                 
                 # Print the prompt for debugging
                 print(f"\n========== CODE GENERATION PROMPT (Attempt {current_attempt}/{max_attempts}) ==========")
@@ -503,77 +610,491 @@ class JavaCodeReviewGraph:
                     print(f"Clean Code Length: {len(clean_code.splitlines())} lines")
                     print(f"Removed {len(annotated_code.splitlines()) - len(clean_code.splitlines())} comment lines")
                     
-                    # Validate that the code actually contains the requested errors
-                    validation_results = validate_code_errors(clean_code, selected_errors)
-                    
-                    print("\n========== CODE VALIDATION RESULTS ==========")
-                    print(f"Valid: {validation_results['valid']}")
-                    print(f"Found Errors: {validation_results['found_errors']}")
-                    print(f"Missing Errors: {validation_results['missing_errors']}")
-                    
-                    # If all errors are implemented, we're done
-                    if validation_results['valid']:
-                        print(f"✅ Valid code with all errors implemented (Attempt {current_attempt})")
-                        # Enrich the error information using the clean code
-                        enhanced_errors, detailed_problems = enrich_error_information(clean_code, selected_errors)
-                        return annotated_code, clean_code, enhanced_errors, detailed_problems
-                    
-                    # Otherwise, store the best result so far (most errors implemented)
-                    if best_validation is None or len(validation_results['found_errors']) > len(best_validation['found_errors']):
-                        best_code = (annotated_code, clean_code)
-                        best_validation = validation_results
+                    # Validate using the enhanced validation
+                    try:
+                        validation_results = validate_code_errors(clean_code, selected_errors)
                         
-                    # If we've found at least 70% of the errors, that's good enough
-                    if len(validation_results['found_errors']) >= int(0.7 * len(selected_errors)):
-                        print(f"✅ Found {len(validation_results['found_errors'])}/{len(selected_errors)} errors (>= 70%), accepting result")
-                        # Enrich the error information using the clean code
-                        enhanced_errors, detailed_problems = enrich_error_information(clean_code, selected_errors)
-                        return annotated_code, clean_code, enhanced_errors, detailed_problems
-                    
-                    # If this is our last attempt, provide feedback in the retry
-                    if current_attempt < max_attempts:
-                        # Enhance the prompt with specific guidance on missing errors
-                        missing_errors_info = "\n\nYOUR PREVIOUS ATTEMPT MISSED THESE ERRORS:\n"
-                        for error_name in validation_results['missing_errors']:
+                        # Get detailed evaluation if we have an evaluation agent
+                        if evaluation_agent:
+                            evaluation = evaluation_agent.evaluate_code(clean_code, selected_errors)
+                            print("\n========== CODE EVALUATION RESULTS ==========")
+                            print(f"Valid: {evaluation['valid']}")
+                            print(f"Found Errors: {evaluation['found_errors']}")
+                            print(f"Missing Errors: {evaluation['missing_errors']}")
+                            print("\nDetailed Feedback:")
+                            print(evaluation['feedback'])
+                            
+                            # Get detailed debug info
+                            for error_key, debug in evaluation.get("debug_info", {}).items():
+                                if debug.get("found", False):
+                                    print(f"Found {error_key} at line {debug.get('location')} using methods: {', '.join(debug.get('detection_methods_tried', []))}")
+                                else:
+                                    print(f"Missing {error_key} - tried methods: {', '.join(debug.get('detection_methods_tried', []))}")
+                        else:
+                            print("\n========== SIMPLE VALIDATION RESULTS ==========")
+                            print(f"Valid: {validation_results['valid']}")
+                            print(f"Found Errors: {validation_results['found_errors']}")
+                            print(f"Missing Errors: {validation_results['missing_errors']}")
+                        
+                        # If all errors are implemented, we're done
+                        if validation_results['valid']:
+                            print(f"Valid code with all errors implemented (Attempt {current_attempt})")
+                            # Enrich the error information using the clean code
+                            enhanced_errors, detailed_problems = enrich_error_information(clean_code, selected_errors)
+                            return annotated_code, clean_code, enhanced_errors, detailed_problems
+                        
+                        # Otherwise, store the best result so far (most errors implemented)
+                        if best_validation is None or len(validation_results['found_errors']) > len(best_validation.get('found_errors', [])):
+                            best_code = (annotated_code, clean_code)
+                            best_validation = validation_results
+                            
+                        # If we've found at least 80% of the errors, that's good enough (increased from 70%)
+                        # Only accept if we have at least one error
+                        if (len(selected_errors) > 0 and 
+                            len(validation_results['found_errors']) >= int(0.8 * len(selected_errors)) and
+                            len(validation_results['found_errors']) > 0):
+                            print(f"Found {len(validation_results['found_errors'])}/{len(selected_errors)} errors (>= 80%), accepting result")
+                            # Enrich the error information using the clean code
+                            enhanced_errors, detailed_problems = enrich_error_information(clean_code, selected_errors)
+                            return annotated_code, clean_code, enhanced_errors, detailed_problems
+                        
+                        # Debug output for missing errors
+                        print("\n========== MISSING ERRORS ==========")
+                        for missing in validation_results.get('missing_errors', []):
+                            print(f"- {missing}")
+                            
+                            # Find the corresponding error details
                             for error in selected_errors:
                                 error_key = f"{error.get('type', '').upper()} - {error.get('name', '')}"
-                                if error_key == error_name:
-                                    missing_errors_info += f"- {error_name}: {error.get('description', '')}\n"
-                                    missing_errors_info += f"  Implementation: {error.get('implementation_guide', '')}\n"
-                                    break
-                        
-                        # Add this information to the prompt
-                        prompt += missing_errors_info
-                        prompt += "\nPlease try again and make sure to implement ALL the requested errors in the code!"
+                                if error_key == missing:
+                                    print(f"  Description: {error.get('description', 'No description')}")
+                                    print(f"  Implementation guide: {error.get('implementation_guide', 'No guide')}")
+                    
+                    except Exception as e:
+                        logger.error(f"Error in code validation: {str(e)}")
+                        import traceback
+                        traceback.print_exc()
+                        # Continue with next attempt
+                        continue
             
             # If we've tried our maximum attempts but still haven't found all errors,
-            # use the best result so far
+            # manually add error annotations for missing errors
             if best_code:
-                print(f"⚠️ Using best result after {max_attempts} attempts - found {len(best_validation['found_errors'])}/{len(selected_errors)} errors")
+                print(f"�Using best result after {max_attempts} attempts - found {len(best_validation['found_errors'])}/{len(selected_errors)} errors")
                 annotated_code, clean_code = best_code
+                
+                # Try forcibly adding obvious errors for any missing errors
+                if best_validation.get('missing_errors') and len(best_validation['missing_errors']) > 0:
+                    print("\n========== MANUALLY ADDING MISSING ERRORS ==========")
+                    # Get just the code without annotations
+                    pure_code = clean_code
+                    modified_code = pure_code
+                    
+                    # Add missing errors with clear annotations
+                    for missing_error in best_validation.get('missing_errors', []):
+                        print(f"Adding missing error: {missing_error}")
+                        
+                        # Find matching error details
+                        error_details = None
+                        for error in selected_errors:
+                            error_key = f"{error.get('type', '').upper()} - {error.get('name', '')}"
+                            if error_key == missing_error:
+                                error_details = error
+                                break
+                        
+                        if not error_details:
+                            continue
+                            
+                        error_type = error_details.get("type", "").lower()
+                        error_name = error_details.get("name", "")
+                        
+                        # Generate code snippets for common error types
+                        if error_type == "build":
+                            if "cannot find symbol" in error_name.lower():
+                                # Add a variable usage without declaration
+                                modified_code = self._insert_in_main_method(modified_code, 
+                                    "// ERROR: BUILD - Cannot find symbol - Using undeclared variable\n        int result = undeclaredVar + 5;")
+                            
+                            elif "incompatible types" in error_name.lower():
+                                # Add incompatible type assignment
+                                modified_code = self._insert_in_main_method(modified_code,
+                                    "// ERROR: BUILD - Incompatible types - Assigning String to int\n        int value = \"hello\";")
+                            
+                            elif "missing return" in error_name.lower():
+                                # Add method with missing return
+                                method_code = """
+        // ERROR: BUILD - Missing return statement - Method missing return in some paths
+        public int calculateValue(int input) {
+            if (input > 0) {
+                return input * 2;
+            }
+            // Missing return statement for else case
+        }
+    """
+                                modified_code = self._insert_in_class(modified_code, method_code)
+                            
+                            elif "null" in error_name.lower() or "nullpointer" in error_name.lower():
+                                # Add null pointer access
+                                modified_code = self._insert_in_main_method(modified_code,
+                                    "// ERROR: BUILD - NullPointerException - Accessing method on null object\n        String str = null;\n        int length = str.length();")
+                            
+                            elif "string" in error_name.lower() and "==" in error_name.lower():
+                                # Add string comparison with ==
+                                modified_code = self._insert_in_main_method(modified_code,
+                                    "// ERROR: BUILD - String comparison using == - Using == instead of equals()\n        String s1 = \"hello\";\n        String s2 = \"h\" + \"ello\";\n        if (s1 == s2) {\n            System.out.println(\"Strings are same\");\n        }")
+                        
+                        elif error_type == "checkstyle":
+                            if "typename" in error_name.lower():
+                                # Add class with improper naming
+                                modified_code += """
+
+    // ERROR: CHECKSTYLE - TypeName - Class name should start with uppercase
+    class myClass {
+        public void doSomething() {
+            // Empty method
+        }
+    }
+    """
+                            
+                            elif "membername" in error_name.lower():
+                                # Add member with improper naming
+                                modified_code = self._insert_in_class(modified_code,
+                                    "// ERROR: CHECKSTYLE - MemberName - Variable name should use lowerCamelCase\n    private String User_Name = \"John\";")
+                            
+                            elif "methodname" in error_name.lower():
+                                # Add method with improper naming
+                                modified_code = self._insert_in_class(modified_code,
+                                    "// ERROR: CHECKSTYLE - MethodName - Method name should use lowerCamelCase\n    public void PrintMessage() {\n        System.out.println(\"Hello\");\n    }")
+                            
+                            elif "whitespace" in error_name.lower():
+                                # Add code with whitespace issues
+                                modified_code = self._insert_in_main_method(modified_code,
+                                    "// ERROR: CHECKSTYLE - WhitespaceAround - Missing whitespace around operators\n        int x=5+3;")
+                    
+                    # Use the modified code with forced errors
+                    clean_code = modified_code
+                    
+                    # Keep comments for annotated_code version
+                    lines = modified_code.splitlines()
+                    annotated_lines = []
+                    
+                    for line in lines:
+                        annotated_lines.append(line)
+                    
+                    annotated_code = "\n".join(annotated_lines)
+                
+                # Enrich the error information using the clean code
                 enhanced_errors, detailed_problems = enrich_error_information(clean_code, selected_errors)
                 return annotated_code, clean_code, enhanced_errors, detailed_problems
+        
+        # Fallback: generate clean code and manually add errors
+        try:
+            base_code = self.code_generator.generate_java_code(
+                code_length=code_length,
+                difficulty_level=difficulty_level
+            )
             
-        # Fallback: generate clean code and manually note errors
-        base_code = self.code_generator.generate_java_code(
-            code_length=code_length,
-            difficulty_level=difficulty_level
-        )
+            # Print fallback generation for debugging
+            print("\n========== FALLBACK CODE GENERATION ==========")
+            print(base_code)
+            
+            # Create clean code (start with base code)
+            clean_code = strip_error_annotations(base_code)
+            
+            # For fallback, manually add obvious errors and annotations
+            modified_code = clean_code
+            
+            # Only add errors if we have any requested
+            if selected_errors:
+                print("\n========== MANUALLY ADDING ERRORS IN FALLBACK MODE ==========")
+                for error in selected_errors:
+                    error_type = error.get("type", "").lower() 
+                    error_name = error.get("name", "")
+                    
+                    print(f"Adding error: {error_type.upper()} - {error_name}")
+                    
+                    # Add appropriate error code based on type
+                    if error_type == "build":
+                        # Handle common build error types
+                        if "cannot find symbol" in error_name.lower():
+                            modified_code = self._insert_in_main_method(modified_code, 
+                                "// ERROR: BUILD - Cannot find symbol - Using undeclared variable\n        int result = undeclaredVar + 5;")
+                        
+                        elif "incompatible types" in error_name.lower():
+                            modified_code = self._insert_in_main_method(modified_code,
+                                "// ERROR: BUILD - Incompatible types - Assigning String to int\n        int value = \"hello\";")
+                        
+                        elif "missing return" in error_name.lower():
+                            method_code = """
+        // ERROR: BUILD - Missing return statement - Method missing return in some paths
+        public int calculateValue(int input) {
+            if (input > 0) {
+                return input * 2;
+            }
+            // Missing return statement for else case
+        }
+    """
+                            modified_code = self._insert_in_class(modified_code, method_code)
+                        
+                        elif "null" in error_name.lower() or "nullpointer" in error_name.lower():
+                            modified_code = self._insert_in_main_method(modified_code,
+                                "// ERROR: BUILD - NullPointerException - Accessing method on null object\n        String str = null;\n        int length = str.length();")
+                        
+                        elif ("string" in error_name.lower() or "equals" in error_name.lower()) and "==" in error_name.lower():
+                            modified_code = self._insert_in_main_method(modified_code,
+                                "// ERROR: BUILD - String comparison using == - Using == instead of equals()\n        String s1 = \"hello\";\n        String s2 = \"h\" + \"ello\";\n        if (s1 == s2) {\n            System.out.println(\"Strings are same\");\n        }")
+                        
+                        else:
+                            # Generic build error
+                            modified_code = self._insert_in_main_method(modified_code,
+                                f"// ERROR: BUILD - {error_name} - Generic implementation\n        // This code has a {error_name} error\n        throw new RuntimeException(\"Build error: {error_name}\");")
+                    
+                    elif error_type == "checkstyle":
+                        # Handle common checkstyle error types
+                        if "typename" in error_name.lower():
+                            modified_code += """
+
+    // ERROR: CHECKSTYLE - TypeName - Class name should start with uppercase
+    class myClass {
+        public void doSomething() {
+            // Empty method
+        }
+    }
+    """
+                        
+                        elif "membername" in error_name.lower():
+                            modified_code = self._insert_in_class(modified_code,
+                                "// ERROR: CHECKSTYLE - MemberName - Variable name should use lowerCamelCase\n    private String User_Name = \"John\";")
+                        
+                        elif "methodname" in error_name.lower():
+                            modified_code = self._insert_in_class(modified_code,
+                                "// ERROR: CHECKSTYLE - MethodName - Method name should use lowerCamelCase\n    public void PrintMessage() {\n        System.out.println(\"Hello\");\n    }")
+                        
+                        elif "whitespace" in error_name.lower():
+                            modified_code = self._insert_in_main_method(modified_code,
+                                "// ERROR: CHECKSTYLE - WhitespaceAround - Missing whitespace around operators\n        int x=5+3;")
+                        
+                        else:
+                            # Generic checkstyle error - add empty code style comment
+                            modified_code = self._insert_in_class(modified_code,
+                                f"// ERROR: CHECKSTYLE - {error_name} - Generic implementation\n    // This violates {error_name} style guideline\n    public void badlyNamedMethod_withUnderscore() {{}}")
+            
+            # Use the modified code with added errors as both clean and annotated version
+            clean_code = modified_code
+            annotated_code = modified_code
+            
+            # Enrich the error information using the clean code
+            enhanced_errors, detailed_problems = enrich_error_information(clean_code, selected_errors)
+            
+            return annotated_code, clean_code, enhanced_errors, detailed_problems
         
-        # Print fallback generation for debugging
-        print("\n========== FALLBACK CODE GENERATION ==========")
-        print(base_code)
+        except Exception as e:
+            logger.error(f"Error in fallback code generation: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            # Ultra-fallback - create minimal Java code with obvious errors
+            annotated_code = """
+    // Fallback Java code with errors
+    public class Main {
+        // ERROR: CHECKSTYLE - MemberName - Variable name should use lowerCamelCase
+        private String User_Name = "John";
         
-        # Create clean code (same as base code in this case, but without comments)
-        clean_code = strip_error_annotations(base_code)
+        public static void main(String[] args) {
+            // ERROR: BUILD - NullPointerException - Accessing method on null object
+            String str = null;
+            int length = str.length();
+            
+            // ERROR: BUILD - Cannot find symbol - Using undeclared variable
+            int result = undeclaredVar + 5;
+        }
         
-        # For fallback, keep the base code as annotated version
-        annotated_code = base_code
+        // ERROR: BUILD - Missing return statement - Method missing return in some paths
+        public int calculateValue(int input) {
+            if (input > 0) {
+                return input * 2;
+            }
+            // Missing return statement for else case
+        }
+    }
+
+    // ERROR: CHECKSTYLE - TypeName - Class name should start with uppercase
+    class myClass {
+        public void doSomething() {
+            // Empty method
+        }
+    }
+    """
+            clean_code = """
+    public class Main {
+        private String User_Name = "John";
         
-        # Even for fallback, try to enrich the error information
-        enhanced_errors, detailed_problems = enrich_error_information(clean_code, selected_errors)
+        public static void main(String[] args) {
+            String str = null;
+            int length = str.length();
+            
+            int result = undeclaredVar + 5;
+        }
         
-        return annotated_code, clean_code, enhanced_errors, detailed_problems
+        public int calculateValue(int input) {
+            if (input > 0) {
+                return input * 2;
+            }
+        }
+    }
+
+    class myClass {
+        public void doSomething() {
+        }
+    }
+    """
+            
+            # Create some basic enhanced errors
+            error1 = {"type": "checkstyle", "name": "MemberName", "line_number": 3, "line_content": 'private String User_Name = "John";'}
+            error2 = {"type": "build", "name": "NullPointerException", "line_number": 7, "line_content": "int length = str.length();"}
+            error3 = {"type": "build", "name": "Cannot find symbol", "line_number": 9, "line_content": "int result = undeclaredVar + 5;"}
+            enhanced_errors = [error1, error2, error3]
+            
+            # Create problem descriptions
+            problem1 = "CHECKSTYLE ERROR - MemberName: Member variable names should use lowerCamelCase"
+            problem2 = "BUILD ERROR - NullPointerException: Object accessed without null check"
+            problem3 = "BUILD ERROR - Cannot find symbol: Using variable that hasn't been declared"
+            detailed_problems = [problem1, problem2, problem3]
+            
+            return annotated_code, clean_code, enhanced_errors, detailed_problems
+
+    def _insert_in_main_method(self, code: str, insertion: str) -> str:
+        """
+        Insert code into the main method of a Java class.
+        
+        Args:
+            code: The original code
+            insertion: The code to insert
+            
+        Returns:
+            Updated code with the insertion
+        """
+        lines = code.splitlines()
+        
+        # Look for main method
+        main_start = -1
+        main_brace_count = 0
+        found_open_brace = False
+        
+        for i, line in enumerate(lines):
+            if "public static void main" in line:
+                main_start = i
+            
+            if main_start != -1 and i >= main_start:
+                if "{" in line:
+                    found_open_brace = True
+                    main_brace_count += line.count("{")
+                if "}" in line:
+                    main_brace_count -= line.count("}")
+                
+                # Insert after the opening brace of the main method
+                if found_open_brace and main_brace_count == 1 and "public static void main" not in line:
+                    # Insert after this line
+                    lines.insert(i + 1, insertion)
+                    return "\n".join(lines)
+        
+        # If no main method found, create one
+        if main_start == -1:
+            # Look for a class definition instead
+            class_start = -1
+            class_brace_count = 0
+            
+            for i, line in enumerate(lines):
+                if "class" in line and "{" in line:
+                    class_start = i
+                    class_brace_count = 1
+                    break
+            
+            if class_start != -1:
+                # Find where to insert the main method in the class
+                insert_idx = class_start + 1
+                
+                # Skip past any class-level fields or methods to find a good insertion point
+                while insert_idx < len(lines) and class_brace_count > 0:
+                    if "{" in lines[insert_idx]:
+                        class_brace_count += lines[insert_idx].count("{")
+                    if "}" in lines[insert_idx]:
+                        class_brace_count -= lines[insert_idx].count("}")
+                        
+                        # If we're back to brace level 1, we're at class level
+                        if class_brace_count == 1:
+                            # Insert main method after this line
+                            main_method = f"""
+        public static void main(String[] args) {{
+    {insertion}
+        }}"""
+                            lines.insert(insert_idx + 1, main_method)
+                            return "\n".join(lines)
+                    
+                    insert_idx += 1
+                
+                # If we didn't find a good spot, just add the main method at the end of the class
+                # Find the class closing brace
+                for i in range(len(lines) - 1, class_start, -1):
+                    if "}" in lines[i] and not "{" in lines[i]:
+                        main_method = f"""
+        public static void main(String[] args) {{
+    {insertion}
+        }}"""
+                        lines.insert(i, main_method)
+                        return "\n".join(lines)
+        
+        # If everything else fails, create a basic class with main method
+        new_code = f"""public class Main {{
+        public static void main(String[] args) {{
+    {insertion}
+        }}
+    }}"""
+        
+        # Append to existing code if it exists
+        if code.strip():
+            return code + "\n\n" + new_code
+        else:
+            return new_code
+
+    def _insert_in_class(self, code: str, insertion: str) -> str:
+        """
+        Insert code inside a Java class definition.
+        
+        Args:
+            code: The original code
+            insertion: The code to insert
+            
+        Returns:
+            Updated code with the insertion
+        """
+        lines = code.splitlines()
+        
+        # Look for class definition
+        class_start = -1
+        
+        for i, line in enumerate(lines):
+            if "class" in line and "{" in line:
+                class_start = i
+                # Insert after the class declaration line
+                lines.insert(i + 1, insertion)
+                return "\n".join(lines)
+        
+        # If no class found, create one
+        if class_start == -1:
+            new_code = f"""public class Main {{
+    {insertion}
+
+        public static void main(String[] args) {{
+            System.out.println("Hello, World!");
+        }}
+    }}"""
+            
+            # Append to existing code if it exists
+            if code.strip():
+                return code + "\n\n" + new_code
+            else:
+                return new_code
         
     def _generate_comparison_report(self, known_problems: List[str], review_analysis: Dict[str, Any]) -> str:
         """Generate a comparison report between student review and known problems."""
