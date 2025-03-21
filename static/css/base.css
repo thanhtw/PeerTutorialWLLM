@@ -1,9 +1,25 @@
 /* Base styles that apply across the application */
 :root {
-  --text: ##ffffff;
-  --text-secondary: #666666;
+  /* Core colors */
+  --primary: #4c68d7;
+  --primary-dark: #3a56c5;
+  --primary-light: #6a82df;
+  --success: #28a745;
+  --warning: #ffc107;
+  --error: #dc3545;
+  --card-bg: None;
+  --border: #e9ecef;
+  --shadow: rgba(0,0,0,0.05);
+  
+  /* Text colors */
+  --text: #ffffff;
+  --text-secondary: #ffffff;
   --text-on-primary: #ffffff;
   --text-on-dark: #ffffff;
+  
+  /* GPU theme color */
+  --gpu-color: #764abc;
+  --gpu-bg-light: rgba(118, 74, 188, 0.1);
 }
 
 [data-theme="dark"] {
@@ -300,4 +316,8 @@
   background-color: rgba(118, 74, 188, 0.1);
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+.st-c3{
+  background-color: none !important;
 }

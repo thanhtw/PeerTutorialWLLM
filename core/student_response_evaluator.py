@@ -8,8 +8,7 @@ student reviews and provides feedback on how well they identified issues.
 import re
 import logging
 import json
-import random  
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any
 from langchain_core.language_models import BaseLanguageModel
 from utils.code_utils import format_list
 

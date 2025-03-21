@@ -22,14 +22,9 @@ class CodeDisplayUI:
     UI Component for displaying Java code snippets.
     
     This class handles displaying Java code snippets with syntax highlighting,
-    line numbers, and optional instructor view.
-    """
+    line numbers, and optional instructor view.    """
     
-    # Update the render_code_display method in ui/code_display.py
-
-    # In ui/code_display.py, update the render_code_display method:
-
-    # In ui/code_display.py, update the render_code_display method:
+   
 
     def render_code_display(self, code_snippet, known_problems: List[str] = None) -> None:
         """
@@ -60,8 +55,7 @@ class CodeDisplayUI:
                 from utils.code_utils import strip_error_annotations
                 display_code = strip_error_annotations(code_snippet.code)
         
-        # Double-check for any remaining error annotations (extra safety measure)
-        import re
+                
         lines = display_code.splitlines()
         cleaned_lines = []
         for line in lines:

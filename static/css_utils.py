@@ -11,6 +11,9 @@ def load_css(css_file=None, css_directory=None):
     Args:
         css_file: Path to single CSS file
         css_directory: Path to directory containing CSS files
+        
+    Returns:
+        List of loaded CSS file names or empty list if none loaded
     """
     css_content = ""
     loaded_files = []
@@ -34,13 +37,36 @@ def load_css(css_file=None, css_directory=None):
                     css_content += f.read()
                     loaded_files.append("base.css")
             
-            # Then load all other CSS files
+            # Then load components.css
+            components_css_path = os.path.join(css_directory, "components.css")
+            if os.path.exists(components_css_path):
+                with open(components_css_path, 'r') as f:
+                    css_content += f.read()
+                    loaded_files.append("components.css")
+            
+            # Then load model_manager.css
+            model_manager_css_path = os.path.join(css_directory, "model_manager.css")
+            if os.path.exists(model_manager_css_path):
+                with open(model_manager_css_path, 'r') as f:
+                    css_content += f.read()
+                    loaded_files.append("model_manager.css")
+            
+            # Finally load tabs.css
+            tabs_css_path = os.path.join(css_directory, "tabs.css")
+            if os.path.exists(tabs_css_path):
+                with open(tabs_css_path, 'r') as f:
+                    css_content += f.read()
+                    loaded_files.append("tabs.css")
+            
+            # Load any remaining CSS files (except main.css which is now obsolete)
             for filename in sorted(os.listdir(css_directory)):
-                if filename.endswith('.css') and filename != "base.css":
+                if (filename.endswith('.css') and 
+                    filename not in ["base.css", "components.css", "model_manager.css", "tabs.css", "main.css"]):
                     file_path = os.path.join(css_directory, filename)
                     with open(file_path, 'r') as f:
                         css_content += f.read()
                         loaded_files.append(filename)
+                        
         except Exception as e:
             st.error(f"Error loading CSS files from directory {css_directory}: {str(e)}")
     
@@ -51,122 +77,3 @@ def load_css(css_file=None, css_directory=None):
     
     return []
 
-def inject_custom_css():
-    """Force injection of critical CSS directly including text color fixes."""
-    st.markdown("""
-    <style>
-    /* Color variables for proper text visibility */
-    :root {
-      --text: #333333;
-      --text-secondary: #666666;
-      --text-on-primary: #ffffff;
-      --text-on-dark: #ffffff;
-    }
-    
-    [data-theme="dark"] {
-      --text: #ffffff;
-      --text-secondary: #cccccc;
-      --text-on-primary: #ffffff;
-      --text-on-dark: #ffffff;
-    }
-    
-    /* Critical styling for dark mode compatibility */
-    .stTabs [data-baseweb="tab-list"] {
-      gap: 10px;
-      background-color: #262730;
-      padding: 10px 10px 0 10px;
-      border-radius: 10px 10px 0 0;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-      height: 50px;
-      background-color: #3b4253;
-      border-radius: 8px 8px 0 0;
-      padding: 8px 16px;
-      font-weight: 500;
-      color: var(--text-secondary);
-    }
-    
-    .stTabs [aria-selected="true"] {
-      background-color: #4c68d7;
-      color: var(--text-on-primary);
-    }
-    
-    /* Tab label components */
-    .tab-label {
-      display: flex;
-      align-items: center;
-      color: var(--text);
-    }
-    
-    .tab-number {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      background-color: rgba(255, 255, 255, 0.2);
-      border-radius: 50%;
-      margin-right: 8px;
-      font-weight: bold;
-      color: var(--text-on-dark);
-    }
-    
-    /* Model card styling */
-    .model-card {
-      background-color: var(--card-bg);
-      border-left: 5px solid #ccc;
-      padding: 12px;
-      margin-bottom: 12px;
-      border-radius: 4px;
-      color: var(--text);
-    }
-    
-    .model-available {
-      border-left-color: #4CAF50;
-      background-color: rgb(14, 17, 23) !important;
-    }
-    
-    .model-name, .model-title, .role-title {
-      color: var(--text);
-    }
-    
-    .model-id, .model-description, .role-description {
-      color: white;
-    }
-    
-    /* Fix for buttons */
-    button[data-testid="baseButton-primary"] {
-      background-color: #4c68d7 !important;
-      color: white !important;
-    }
-    
-    /* Fix text in model selection roles */
-    .model-role {
-      color: var(--text);
-    }
-    
-    .selected-model {
-      color: white;
-    }
-    
-    /* Fix text in problem areas */
-    .problem-area-card {
-      color: var(--text);
-    }
-    
-    .problem-area-description {
-      color: var(--text-secondary);
-    }
-    
-    /* Fix guidance boxes */
-    .guidance-box, .warning-box, .feedback-box, .review-box {
-      color: var(--text);
-    }
-    
-    /* Fix text in review history */
-    .review-history-box pre {
-      color: var(--text);
-    }
-    </style>
-    """, unsafe_allow_html=True)

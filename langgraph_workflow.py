@@ -10,7 +10,7 @@ import logging
 import os
 import random
 import re
-from typing import Dict, List, Any, Annotated, TypedDict, Tuple, cast, Optional
+from typing import Dict, List, Any, Tuple
 from langgraph.graph import StateGraph, END
 from state_schema import WorkflowState, CodeSnippet, ReviewAttempt
 
@@ -23,13 +23,13 @@ from llm_manager import LLMManager
 
 from utils.code_utils import (
     create_code_generation_prompt, 
-    extract_code_from_response, 
-    add_error_comments,
+    extract_code_from_response,   
     get_error_count_for_difficulty,
     generate_comparison_report,
     strip_error_annotations
 )
 from utils.enhanced_error_tracking import enrich_error_information
+from utils.code_evaluation_agent import CodeEvaluationAgent
 
 # Configure logging
 logging.basicConfig(
@@ -75,8 +75,7 @@ class JavaCodeReviewGraph:
             self.feedback_manager = FeedbackManager(self.evaluator)
             
             # Initialize the new code evaluation agent
-            try:
-                from utils.code_evaluation_agent import CodeEvaluationAgent
+            try:                
                 self.code_evaluation_agent = CodeEvaluationAgent()
                 logger.info("Successfully initialized Code Evaluation Agent")
             except Exception as e:
@@ -104,8 +103,8 @@ class JavaCodeReviewGraph:
         
         # Define nodes
         workflow.add_node("generate_code", self.generate_code_node)
-        workflow.add_node("evaluate_code", self.evaluate_code_node)  # New node
-        workflow.add_node("regenerate_code", self.regenerate_code_node)  # New node
+        workflow.add_node("evaluate_code", self.evaluate_code_node) 
+        workflow.add_node("regenerate_code", self.regenerate_code_node)
         workflow.add_node("review_code", self.review_code_node)
         workflow.add_node("analyze_review", self.analyze_review_node)
         workflow.add_node("generate_summary", self.generate_summary_node)
@@ -1334,28 +1333,4 @@ class JavaCodeReviewGraph:
             state.error = f"Error evaluating code: {str(e)}"
             return state
         
-    def debug_state(state: WorkflowState):
-        """Print detailed debug info about the current state"""
-        print("\n========== STATE DEBUG ==========")
-        print(f"Current step: {state.current_step}")
-        print(f"Error: {state.error}")
-        print(f"Current iteration: {state.current_iteration}")
-        print(f"Max iterations: {state.max_iterations}")
-        print(f"Review sufficient: {state.review_sufficient}")
-        
-        if hasattr(state, 'code_snippet') and state.code_snippet:
-            print("Code snippet: Present")
-            print(f"  Code length: {len(state.code_snippet.code) if hasattr(state.code_snippet, 'code') else 'N/A'}")
-            print(f"  Clean code length: {len(state.code_snippet.clean_code) if hasattr(state.code_snippet, 'clean_code') else 'N/A'}")
-            print(f"  Known problems: {len(state.code_snippet.known_problems) if hasattr(state.code_snippet, 'known_problems') else 'N/A'}")
-        else:
-            print("Code snippet: Missing")
-        
-        if hasattr(state, 'evaluation_result') and state.evaluation_result:
-            print("Evaluation result: Present")
-            print(f"  Found errors: {len(state.evaluation_result.get('found_errors', []))}")
-            print(f"  Missing errors: {len(state.evaluation_result.get('missing_errors', []))}")
-        else:
-            print("Evaluation result: Missing")
-        
-        print("================================")
+   

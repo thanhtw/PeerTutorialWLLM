@@ -14,7 +14,7 @@ from typing import Dict, List, Any, Optional
 from dotenv import load_dotenv
 
 # Import CSS utilities
-from static.css_utils import load_css, inject_custom_css
+from static.css_utils import load_css
 
 
 # Configure logging
@@ -60,8 +60,6 @@ st.set_page_config(
 # Load CSS from external files
 css_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "css")
 loaded_files = load_css(css_directory=css_dir)
-inject_custom_css()
-
 
 
 if not load_css(css_directory=css_dir):
@@ -995,48 +993,6 @@ def render_feedback_tab(workflow, feedback_display_ui):
         on_reset_callback=handle_reset
     )
 
-def render_model_manager_sidebar(llm_manager, model_manager_ui):
-    """Render the improved model manager in the sidebar."""
-    # Get available models
-    available_models = llm_manager.get_available_models()
-    
-    # Filter out only pulled models for selection
-    model_options = [model["id"] for model in available_models if model["pulled"]]
-    
-    if not model_options:
-        st.warning("No models available. Please pull at least one model in the Models tab.")
-        return {}
-    
-    # Render the enhanced model selection table
-    model_selections = model_manager_ui.render_model_selection_table(model_options)
-    
-    # Check for model pulls in progress
-    if st.session_state.model_operations["pulling"]:
-        model_name = st.session_state.model_operations["current_pull"]
-        
-        # Create a progress indicator
-        st.subheader(f"Pulling model: {model_name}")
-        progress_bar = st.progress(0)
-        
-        # Start the download in a separate thread
-        if st.session_state.model_operations["pull_progress"] == 0:
-            success = llm_manager.download_ollama_model(model_name)
-            
-            if success:
-                st.session_state.model_operations["pulling"] = False
-                st.session_state.model_operations["last_pulled"] = model_name
-                st.session_state.model_operations["error"] = None
-                st.rerun()
-            else:
-                st.session_state.model_operations["pulling"] = False
-                st.session_state.model_operations["error"] = f"Failed to pull model: {model_name}"
-                st.rerun()
-        
-        # Update progress bar
-        progress_status = llm_manager.get_pull_status(model_name)
-        progress_bar.progress(progress_status.get("progress", 0) / 100)
-    
-    return model_selections
 
 def main():
     """Enhanced main application function."""

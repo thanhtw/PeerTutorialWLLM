@@ -8,7 +8,6 @@ eliminating the reliance on predefined templates.
 
 import random
 import logging
-from typing import Dict, Any, List, Optional, Tuple
 from langchain_core.language_models import BaseLanguageModel
 from utils.code_utils import create_code_generation_prompt, extract_code_from_response
 
