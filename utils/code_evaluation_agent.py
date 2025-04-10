@@ -603,4 +603,4 @@ Be thorough and precise in your analysis, ensuring that you identify exactly whe
             if max_domain[1] > 0:
                 return max_domain[0]
         
-        return "general_application"  # Default domain 
+        return "general_application"  # Default domain
