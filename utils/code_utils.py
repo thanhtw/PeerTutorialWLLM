@@ -425,9 +425,6 @@ This format helps others quickly understand the location, type, and impact of ea
     
     return report
 
-
-# In utils/code_utils.py, replace the strip_error_annotations function:
-
 def strip_error_annotations(code: str) -> str:
     """
     Remove error annotation comments from code while preserving string literals.

@@ -28,7 +28,9 @@ from utils.code_utils import (
     generate_comparison_report,
     strip_error_annotations
 )
+
 from utils.enhanced_error_tracking import enrich_error_information
+
 from utils.code_evaluation_agent import CodeEvaluationAgent
 
 # Configure logging
@@ -522,16 +524,17 @@ class JavaCodeReviewGraph:
         Returns:
             Tuple of (annotated_code, clean_code, enhanced_errors, detailed_problems)
         """
-        # Import the CodeEvaluationAgent
-        from utils.code_evaluation_agent import CodeEvaluationAgent
+        
         # Import the validation function
         from utils.error_validation import validate_code_errors
         
         # Initialize the evaluation agent if not already done
         if not hasattr(self, 'code_evaluation_agent') or self.code_evaluation_agent is None:
             try:
-                self.code_evaluation_agent = CodeEvaluationAgent()
-                logger.info("Created Code Evaluation Agent for error detection")
+                # Get an appropriate LLM for evaluation
+                evaluation_llm = self.llm_manager.initialize_model_from_env("GENERATIVE_MODEL", "GENERATIVE_TEMPERATURE")
+                self.code_evaluation_agent = CodeEvaluationAgent(llm=evaluation_llm)
+                logger.info("Created Code Evaluation Agent with LLM for error detection")
             except Exception as e:
                 logger.error(f"Error initializing Code Evaluation Agent: {str(e)}")
                 self.code_evaluation_agent = None
@@ -655,28 +658,32 @@ class JavaCodeReviewGraph:
                     print(f"Clean Code Length: {len(clean_code.splitlines())} lines")
                     print(f"Removed {len(annotated_code.splitlines()) - len(clean_code.splitlines())} comment lines")
                     
-                    # Validate using the enhanced validation
+                    # Validate using LLM evaluation if available
                     try:
-                        validation_results = validate_code_errors(clean_code, selected_errors)
-                        
-                        # Get detailed evaluation if we have an evaluation agent
-                        if evaluation_agent:
-                            evaluation = evaluation_agent.evaluate_code(clean_code, selected_errors)
-                            print("\n========== CODE EVALUATION RESULTS ==========")
-                            print(f"Valid: {evaluation['valid']}")
-                            print(f"Found Errors: {evaluation['found_errors']}")
-                            print(f"Missing Errors: {evaluation['missing_errors']}")
-                            print("\nDetailed Feedback:")
-                            print(evaluation['feedback'])
+                        if evaluation_agent and evaluation_agent.llm:
+                            # Use LLM-based validation
+                            validation_results = evaluation_agent._evaluate_with_llm(clean_code, selected_errors)
                             
-                            # Get detailed debug info
-                            for error_key, debug in evaluation.get("debug_info", {}).items():
-                                if debug.get("found", False):
-                                    print(f"Found {error_key} at line {debug.get('location')} using methods: {', '.join(debug.get('detection_methods_tried', []))}")
-                                else:
-                                    print(f"Missing {error_key} - tried methods: {', '.join(debug.get('detection_methods_tried', []))}")
+                            print("\n========== LLM CODE EVALUATION RESULTS ==========")
+                            print(f"Valid: {validation_results['valid']}")
+                            print(f"Found Errors: {validation_results['found_errors']}")
+                            print(f"Missing Errors: {validation_results['missing_errors']}")
+                            if "llm_feedback" in validation_results:
+                                print("\nLLM Feedback:")
+                                print(validation_results["llm_feedback"])
+                            
+                            # Check error locations if available
+                            if "detailed_analysis" in validation_results:
+                                found_errors = validation_results["detailed_analysis"].get("found_errors", [])
+                                for error in found_errors:
+                                    print(f"Found {error.get('error_type')} - {error.get('error_name')} at line {error.get('line_number')}")
+                                    print(f"Code segment: {error.get('code_segment')}")
+                                    print(f"Explanation: {error.get('explanation')}")
                         else:
-                            print("\n========== SIMPLE VALIDATION RESULTS ==========")
+                            # Fall back to regex-based validation
+                            validation_results = validate_code_errors(clean_code, selected_errors)
+                            
+                            print("\n========== REGEX VALIDATION RESULTS ==========")
                             print(f"Valid: {validation_results['valid']}")
                             print(f"Found Errors: {validation_results['found_errors']}")
                             print(f"Missing Errors: {validation_results['missing_errors']}")
@@ -693,7 +700,7 @@ class JavaCodeReviewGraph:
                             best_code = (annotated_code, clean_code)
                             best_validation = validation_results
                             
-                        # If we've found at least 80% of the errors, that's good enough (increased from 70%)
+                        # If we've found at least 80% of the errors, that's good enough
                         # Only accept if we have at least one error
                         if (len(selected_errors) > 0 and 
                             len(validation_results['found_errors']) >= int(0.8 * len(selected_errors)) and
@@ -723,110 +730,10 @@ class JavaCodeReviewGraph:
                         continue
             
             # If we've tried our maximum attempts but still haven't found all errors,
-            # manually add error annotations for missing errors
+            # use the best result we found
             if best_code:
-                print(f"�Using best result after {max_attempts} attempts - found {len(best_validation['found_errors'])}/{len(selected_errors)} errors")
+                print(f"Using best result after {max_attempts} attempts - found {len(best_validation['found_errors'])}/{len(selected_errors)} errors")
                 annotated_code, clean_code = best_code
-                
-                # Try forcibly adding obvious errors for any missing errors
-                if best_validation.get('missing_errors') and len(best_validation['missing_errors']) > 0:
-                    print("\n========== MANUALLY ADDING MISSING ERRORS ==========")
-                    # Get just the code without annotations
-                    pure_code = clean_code
-                    modified_code = pure_code
-                    
-                    # Add missing errors with clear annotations
-                    for missing_error in best_validation.get('missing_errors', []):
-                        print(f"Adding missing error: {missing_error}")
-                        
-                        # Find matching error details
-                        error_details = None
-                        for error in selected_errors:
-                            error_key = f"{error.get('type', '').upper()} - {error.get('name', '')}"
-                            if error_key == missing_error:
-                                error_details = error
-                                break
-                        
-                        if not error_details:
-                            continue
-                            
-                        error_type = error_details.get("type", "").lower()
-                        error_name = error_details.get("name", "")
-                        
-                        # Generate code snippets for common error types
-                        if error_type == "build":
-                            if "cannot find symbol" in error_name.lower():
-                                # Add a variable usage without declaration
-                                modified_code = self._insert_in_main_method(modified_code, 
-                                    "// ERROR: BUILD - Cannot find symbol - Using undeclared variable\n        int result = undeclaredVar + 5;")
-                            
-                            elif "incompatible types" in error_name.lower():
-                                # Add incompatible type assignment
-                                modified_code = self._insert_in_main_method(modified_code,
-                                    "// ERROR: BUILD - Incompatible types - Assigning String to int\n        int value = \"hello\";")
-                            
-                            elif "missing return" in error_name.lower():
-                                # Add method with missing return
-                                method_code = """
-        // ERROR: BUILD - Missing return statement - Method missing return in some paths
-        public int calculateValue(int input) {
-            if (input > 0) {
-                return input * 2;
-            }
-            // Missing return statement for else case
-        }
-    """
-                                modified_code = self._insert_in_class(modified_code, method_code)
-                            
-                            elif "null" in error_name.lower() or "nullpointer" in error_name.lower():
-                                # Add null pointer access
-                                modified_code = self._insert_in_main_method(modified_code,
-                                    "// ERROR: BUILD - NullPointerException - Accessing method on null object\n        String str = null;\n        int length = str.length();")
-                            
-                            elif "string" in error_name.lower() and "==" in error_name.lower():
-                                # Add string comparison with ==
-                                modified_code = self._insert_in_main_method(modified_code,
-                                    "// ERROR: BUILD - String comparison using == - Using == instead of equals()\n        String s1 = \"hello\";\n        String s2 = \"h\" + \"ello\";\n        if (s1 == s2) {\n            System.out.println(\"Strings are same\");\n        }")
-                        
-                        elif error_type == "checkstyle":
-                            if "typename" in error_name.lower():
-                                # Add class with improper naming
-                                modified_code += """
-
-    // ERROR: CHECKSTYLE - TypeName - Class name should start with uppercase
-    class myClass {
-        public void doSomething() {
-            // Empty method
-        }
-    }
-    """
-                            
-                            elif "membername" in error_name.lower():
-                                # Add member with improper naming
-                                modified_code = self._insert_in_class(modified_code,
-                                    "// ERROR: CHECKSTYLE - MemberName - Variable name should use lowerCamelCase\n    private String User_Name = \"John\";")
-                            
-                            elif "methodname" in error_name.lower():
-                                # Add method with improper naming
-                                modified_code = self._insert_in_class(modified_code,
-                                    "// ERROR: CHECKSTYLE - MethodName - Method name should use lowerCamelCase\n    public void PrintMessage() {\n        System.out.println(\"Hello\");\n    }")
-                            
-                            elif "whitespace" in error_name.lower():
-                                # Add code with whitespace issues
-                                modified_code = self._insert_in_main_method(modified_code,
-                                    "// ERROR: CHECKSTYLE - WhitespaceAround - Missing whitespace around operators\n        int x=5+3;")
-                    
-                    # Use the modified code with forced errors
-                    clean_code = modified_code
-                    
-                    # Keep comments for annotated_code version
-                    lines = modified_code.splitlines()
-                    annotated_lines = []
-                    
-                    for line in lines:
-                        annotated_lines.append(line)
-                    
-                    annotated_code = "\n".join(annotated_lines)
                 
                 # Enrich the error information using the clean code
                 enhanced_errors, detailed_problems = enrich_error_information(clean_code, selected_errors)
@@ -871,14 +778,14 @@ class JavaCodeReviewGraph:
                         
                         elif "missing return" in error_name.lower():
                             method_code = """
-        // ERROR: BUILD - Missing return statement - Method missing return in some paths
-        public int calculateValue(int input) {
-            if (input > 0) {
-                return input * 2;
+            // ERROR: BUILD - Missing return statement - Method missing return in some paths
+            public int calculateValue(int input) {
+                if (input > 0) {
+                    return input * 2;
+                }
+                // Missing return statement for else case
             }
-            // Missing return statement for else case
-        }
-    """
+        """
                             modified_code = self._insert_in_class(modified_code, method_code)
                         
                         elif "null" in error_name.lower() or "nullpointer" in error_name.lower():
@@ -899,13 +806,13 @@ class JavaCodeReviewGraph:
                         if "typename" in error_name.lower():
                             modified_code += """
 
-    // ERROR: CHECKSTYLE - TypeName - Class name should start with uppercase
-    class myClass {
-        public void doSomething() {
-            // Empty method
+        // ERROR: CHECKSTYLE - TypeName - Class name should start with uppercase
+        class myClass {
+            public void doSomething() {
+                // Empty method
+            }
         }
-    }
-    """
+        """
                         
                         elif "membername" in error_name.lower():
                             modified_code = self._insert_in_class(modified_code,
@@ -940,59 +847,59 @@ class JavaCodeReviewGraph:
             
             # Ultra-fallback - create minimal Java code with obvious errors
             annotated_code = """
-    // Fallback Java code with errors
-    public class Main {
-        // ERROR: CHECKSTYLE - MemberName - Variable name should use lowerCamelCase
-        private String User_Name = "John";
-        
-        public static void main(String[] args) {
-            // ERROR: BUILD - NullPointerException - Accessing method on null object
-            String str = null;
-            int length = str.length();
+        // Fallback Java code with errors
+        public class Main {
+            // ERROR: CHECKSTYLE - MemberName - Variable name should use lowerCamelCase
+            private String User_Name = "John";
             
-            // ERROR: BUILD - Cannot find symbol - Using undeclared variable
-            int result = undeclaredVar + 5;
-        }
-        
-        // ERROR: BUILD - Missing return statement - Method missing return in some paths
-        public int calculateValue(int input) {
-            if (input > 0) {
-                return input * 2;
+            public static void main(String[] args) {
+                // ERROR: BUILD - NullPointerException - Accessing method on null object
+                String str = null;
+                int length = str.length();
+                
+                // ERROR: BUILD - Cannot find symbol - Using undeclared variable
+                int result = undeclaredVar + 5;
             }
-            // Missing return statement for else case
+            
+            // ERROR: BUILD - Missing return statement - Method missing return in some paths
+            public int calculateValue(int input) {
+                if (input > 0) {
+                    return input * 2;
+                }
+                // Missing return statement for else case
+            }
         }
-    }
 
-    // ERROR: CHECKSTYLE - TypeName - Class name should start with uppercase
-    class myClass {
-        public void doSomething() {
-            // Empty method
+        // ERROR: CHECKSTYLE - TypeName - Class name should start with uppercase
+        class myClass {
+            public void doSomething() {
+                // Empty method
+            }
         }
-    }
-    """
+        """
             clean_code = """
-    public class Main {
-        private String User_Name = "John";
-        
-        public static void main(String[] args) {
-            String str = null;
-            int length = str.length();
+        public class Main {
+            private String User_Name = "John";
             
-            int result = undeclaredVar + 5;
-        }
-        
-        public int calculateValue(int input) {
-            if (input > 0) {
-                return input * 2;
+            public static void main(String[] args) {
+                String str = null;
+                int length = str.length();
+                
+                int result = undeclaredVar + 5;
+            }
+            
+            public int calculateValue(int input) {
+                if (input > 0) {
+                    return input * 2;
+                }
             }
         }
-    }
 
-    class myClass {
-        public void doSomething() {
+        class myClass {
+            public void doSomething() {
+            }
         }
-    }
-    """
+        """
             
             # Create some basic enhanced errors
             error1 = {"type": "checkstyle", "name": "MemberName", "line_number": 3, "line_content": 'private String User_Name = "John";'}
@@ -1007,7 +914,7 @@ class JavaCodeReviewGraph:
             detailed_problems = [problem1, problem2, problem3]
             
             return annotated_code, clean_code, enhanced_errors, detailed_problems
-
+    
     def _insert_in_main_method(self, code: str, insertion: str) -> str:
         """
         Insert code into the main method of a Java class.
@@ -1261,6 +1168,7 @@ class JavaCodeReviewGraph:
         """
         Evaluate generated code to ensure it contains the requested errors.
         Acts as a dedicated node in the LangGraph workflow.
+        Uses LLM for more accurate evaluation when available.
         """
         try:
             logger.info("Starting code evaluation node")
@@ -1283,8 +1191,13 @@ class JavaCodeReviewGraph:
             if not hasattr(self, 'code_evaluation_agent') or self.code_evaluation_agent is None:
                 try:
                     from utils.code_evaluation_agent import CodeEvaluationAgent
-                    self.code_evaluation_agent = CodeEvaluationAgent()
-                    logger.info("Created Code Evaluation Agent for evaluation node")
+                    
+                    # Get the appropriate LLM for code evaluation
+                    evaluation_llm = self.llm_manager.initialize_model_from_env("GENERATIVE_MODEL", "GENERATIVE_TEMPERATURE")
+                    
+                    # Create the code evaluation agent with the LLM
+                    self.code_evaluation_agent = CodeEvaluationAgent(llm=evaluation_llm)
+                    logger.info("Created Code Evaluation Agent with LLM for evaluation node")
                 except Exception as e:
                     logger.error(f"Error initializing Code Evaluation Agent: {str(e)}")
                     state.error = f"Error initializing Code Evaluation Agent: {str(e)}"

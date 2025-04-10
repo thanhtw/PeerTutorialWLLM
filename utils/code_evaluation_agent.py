@@ -3,11 +3,13 @@ Code Evaluation Agent for Java Peer Review Training System.
 
 This module provides the CodeEvaluationAgent class which evaluates 
 generated Java code to ensure it contains the required errors.
+Uses an LLM for more accurate analysis when available.
 """
 
 import re
 import logging
 from typing import List, Dict, Any, Optional, Tuple
+from langchain_core.language_models import BaseLanguageModel
 
 from utils.error_validation import validate_code_errors, is_comment, is_primitive_or_common
 
@@ -21,12 +23,22 @@ class CodeEvaluationAgent:
     
     This agent provides detailed feedback on how well the generated code
     implements the required errors, and suggests improvements for the
-    code generator.
+    code generator. Can use an LLM for more accurate evaluation.
     """
     
-    def __init__(self):
-        """Initialize the CodeEvaluationAgent."""
+    def __init__(self, llm: BaseLanguageModel = None):
+        """
+        Initialize the CodeEvaluationAgent with optional LLM.
+        
+        Args:
+            llm: Optional language model for evaluation
+        """
         logger.info("Initializing Code Evaluation Agent")
+        self.llm = llm
+        if llm:
+            logger.info("LLM provided for code evaluation")
+        else:
+            logger.info("No LLM provided, will use regex-based validation")
     
     def evaluate_code(self, code: str, requested_errors: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -42,8 +54,13 @@ class CodeEvaluationAgent:
         try:
             logger.info(f"Evaluating code with {len(requested_errors)} requested errors")
             
-            # Get basic validation results
-            validation_results = validate_code_errors(code, requested_errors)
+            # Use LLM-based evaluation if available, otherwise fall back to regex-based validation
+            if self.llm:
+                validation_results = self._evaluate_with_llm(code, requested_errors)
+                logger.info("Using LLM for code evaluation")
+            else:
+                validation_results = validate_code_errors(code, requested_errors)
+                logger.info("Using regex-based validation (LLM not available)")
             
             # Create more detailed evaluation
             evaluation = {
@@ -54,6 +71,12 @@ class CodeEvaluationAgent:
                 "feedback": self._generate_feedback(code, requested_errors, validation_results),
                 "suggestions": self._generate_suggestions(code, requested_errors, validation_results)
             }
+            
+            # Include LLM feedback if available
+            if "llm_feedback" in validation_results:
+                evaluation["llm_feedback"] = validation_results["llm_feedback"]
+            if "detailed_analysis" in validation_results:
+                evaluation["detailed_analysis"] = validation_results["detailed_analysis"]
             
             logger.info(f"Evaluation complete: found {len(evaluation['found_errors'])} errors, missing {len(evaluation['missing_errors'])} errors")
             return evaluation
@@ -71,19 +94,171 @@ class CodeEvaluationAgent:
                 "suggestions": []
             }
     
+    def _evaluate_with_llm(self, code: str, requested_errors: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Evaluate generated code using an LLM to identify if requested errors are present.
+        
+        Args:
+            code: The generated Java code
+            requested_errors: List of errors that should be implemented
+            
+        Returns:
+            Dictionary with evaluation results
+        """
+        if not self.llm:
+            logger.warning("No LLM provided for evaluation, falling back to regex-based validation")
+            return validate_code_errors(code, requested_errors)
+        
+        # Format the requested errors for the prompt
+        error_descriptions = []
+        for i, error in enumerate(requested_errors, 1):
+            error_type = error.get("type", "").upper()
+            name = error.get("name", "")
+            description = error.get("description", "")
+            implementation_guide = error.get("implementation_guide", "")
+            
+            error_descriptions.append(f"{i}. {error_type} ERROR - {name}\n   Description: {description}\n   Implementation guide: {implementation_guide}")
+        
+        error_list = "\n\n".join(error_descriptions)
+        
+        # Create a prompt for the LLM
+        prompt = f"""You are an expert Java code reviewer tasked with evaluating whether a code snippet correctly implements specific errors.
+
+CODE SNIPPET:
+```java
+{code}
+```
+
+REQUESTED ERRORS TO IMPLEMENT:
+{error_list}
+
+Analyze the code carefully and determine if each requested error is properly implemented.
+For each error, provide:
+1. Whether it is implemented in the code (YES/NO)
+2. The exact line number where the error occurs
+3. The specific code segment that contains the error
+4. A brief explanation of how the error is implemented or why it's missing
+
+Return your analysis in the following JSON format:
+```json
+{{
+  "found_errors": [
+    {{
+      "error_type": "BUILD",
+      "error_name": "NullPointerException",
+      "line_number": 42,
+      "code_segment": "String str = null; int length = str.length();",
+      "explanation": "This will throw NullPointerException because str is null when length() is called"
+    }}
+  ],
+  "missing_errors": [
+    {{
+      "error_type": "CHECKSTYLE",
+      "error_name": "MemberName",
+      "explanation": "No variable names breaking member naming conventions were found in the code"
+    }}
+  ],
+  "valid": false,
+  "feedback": "The code successfully implements 2 out of 3 requested errors. The NullPointerException and StringComparison errors are correctly implemented, but the MemberName error is missing."
+}}
+```
+
+Be thorough and precise in your analysis, ensuring that you identify exactly where and how each error is implemented.
+"""
+        
+        try:
+            # Get response from LLM
+            response = self.llm.invoke(prompt)
+            
+            # Extract JSON from response
+            import re
+            import json
+            
+            json_match = re.search(r'```json\s*([\s\S]*?)\s*```', response)
+            if json_match:
+                json_str = json_match.group(1)
+                try:
+                    analysis = json.loads(json_str)
+                except json.JSONDecodeError:
+                    logger.error("Failed to parse JSON from LLM response")
+                    return validate_code_errors(code, requested_errors)
+            else:
+                # Try to find any JSON object in the response
+                json_match = re.search(r'({[\s\S]*})', response)
+                if json_match:
+                    json_str = json_match.group(1)
+                    try:
+                        analysis = json.loads(json_str)
+                    except json.JSONDecodeError:
+                        logger.error("Failed to parse JSON from LLM response")
+                        return validate_code_errors(code, requested_errors)
+                else:
+                    logger.error("No JSON found in LLM response")
+                    return validate_code_errors(code, requested_errors)
+            
+            # Process the analysis results
+            found_errors = []
+            missing_errors = []
+            error_locations = {}
+            
+            # Extract found errors
+            for error in analysis.get("found_errors", []):
+                error_type = error.get("error_type", "")
+                error_name = error.get("error_name", "")
+                error_key = f"{error_type} - {error_name}"
+                
+                found_errors.append(error_key)
+                error_locations[error_key] = error.get("line_number", 0)
+            
+            # Extract missing errors
+            for error in analysis.get("missing_errors", []):
+                error_type = error.get("error_type", "")
+                error_name = error.get("error_name", "")
+                error_key = f"{error_type} - {error_name}"
+                
+                missing_errors.append(error_key)
+            
+            # Check if we're missing any errors that weren't explicitly mentioned
+            all_requested_keys = [f"{error.get('type', '').upper()} - {error.get('name', '')}" for error in requested_errors]
+            for key in all_requested_keys:
+                if key not in found_errors and key not in missing_errors:
+                    missing_errors.append(key)
+            
+            # Create the validation result
+            validation_results = {
+                "valid": analysis.get("valid", False),
+                "found_errors": found_errors,
+                "missing_errors": missing_errors,
+                "error_locations": error_locations,
+                "llm_feedback": analysis.get("feedback", ""),
+                "detailed_analysis": analysis  # Keep the full LLM analysis for detailed feedback
+            }
+            
+            return validation_results
+            
+        except Exception as e:
+            logger.error(f"Error evaluating code with LLM: {str(e)}")
+            # Fall back to regex-based validation
+            return validate_code_errors(code, requested_errors)
+    
     def _generate_feedback(self, code: str, requested_errors: List[Dict[str, Any]], 
-                          validation_results: Dict[str, Any]) -> str:
+                         validation_results: Dict[str, Any]) -> str:
         """
         Generate detailed feedback on the implementation of errors.
         
         Args:
             code: The generated Java code
             requested_errors: List of errors that should be implemented
-            validation_results: Results from basic validation
+            validation_results: Results from validation
             
         Returns:
             Detailed feedback string
         """
+        # If LLM feedback is available, use it
+        if "llm_feedback" in validation_results and validation_results["llm_feedback"]:
+            return validation_results["llm_feedback"]
+        
+        # Otherwise, use the original feedback generation logic
         lines = code.splitlines()
         feedback = []
         
@@ -125,143 +300,67 @@ class CodeEvaluationAgent:
         return "\n".join(feedback)
     
     def _generate_suggestions(self, code: str, requested_errors: List[Dict[str, Any]], 
-                             validation_results: Dict[str, Any]) -> List[Dict[str, Any]]:
+                            validation_results: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Generate specific suggestions for implementing missing errors.
         
         Args:
             code: The generated Java code
             requested_errors: List of errors that should be implemented
-            validation_results: Results from basic validation
+            validation_results: Results from validation
             
         Returns:
             List of suggestion dictionaries
         """
-        lines = code.splitlines()
         suggestions = []
         
-        # Generate suggestions for each missing error
-        for error_key in validation_results["missing_errors"]:
-            # Find the corresponding error details
-            error_details = None
-            for error in requested_errors:
-                if f"{error.get('type', '').upper()} - {error.get('name', '')}" == error_key:
-                    error_details = error
-                    break
+        # If we have detailed analysis from LLM, use it to generate better suggestions
+        if "detailed_analysis" in validation_results:
+            detailed_analysis = validation_results["detailed_analysis"]
+            missing_errors_analysis = detailed_analysis.get("missing_errors", [])
             
-            if not error_details:
-                continue
+            for error_analysis in missing_errors_analysis:
+                error_type = error_analysis.get("error_type", "")
+                error_name = error_analysis.get("error_name", "")
+                explanation = error_analysis.get("explanation", "")
                 
-            error_type = error_details.get("type", "").lower()
-            error_name = error_details.get("name", "")
-            
-            suggestion = {
-                "error_key": error_key,
-                "suggestions": []
-            }
-            
-            # Generate specific suggestions based on error type
-            if "Cannot find symbol" in error_name:
-                suggestion["suggestions"].append(
-                    "Try using a variable that hasn't been declared, e.g., 'int result = undeclaredVar + 5;'"
-                )
+                error_key = f"{error_type} - {error_name}"
                 
-                # Find possible insertion points
-                method_bodies = self._find_method_bodies(code)
-                if method_bodies:
-                    method_start, method_end = method_bodies[0]
-                    suggestion["insertion_point"] = method_start + 2  # Inside the method
-                    suggestion["sample_code"] = "int result = undeclaredVar + 5; // Using undeclared variable"
-            
-            elif "Incompatible types" in error_name:
-                suggestion["suggestions"].append(
-                    "Try assigning a String to an int variable, e.g., 'int value = \"hello\";'"
-                )
+                suggestion = {
+                    "error_key": error_key,
+                    "suggestions": [explanation]
+                }
                 
-                # Find possible insertion points
-                method_bodies = self._find_method_bodies(code)
-                if method_bodies:
-                    method_start, method_end = method_bodies[0]
-                    suggestion["insertion_point"] = method_start + 2  # Inside the method
-                    suggestion["sample_code"] = "int value = \"hello\"; // Incompatible types"
-            
-            elif "Missing return statement" in error_name:
-                suggestion["suggestions"].append(
-                    "Create a non-void method without a return statement in some execution path"
-                )
+                # Try to find the corresponding error details for implementation guide
+                for error in requested_errors:
+                    if f"{error.get('type', '').upper()} - {error.get('name', '')}" == error_key:
+                        implementation_guide = error.get("implementation_guide", "")
+                        if implementation_guide:
+                            suggestion["suggestions"].append(f"Implementation guide: {implementation_guide}")
+                        break
                 
-                method_bodies = self._find_method_bodies(code)
-                if method_bodies:
-                    suggestion["insertion_point"] = method_bodies[0][0]  # Start of first method
-                    suggestion["sample_code"] = """public int calculateValue(int input) {
-    if (input > 0) {
-        return input * 2;
-    }
-    // Missing return statement for else case
-}"""
-            
-            elif "MemberName" in error_name:
-                suggestion["suggestions"].append(
-                    "Define a member variable with improper naming (using underscore or starting with uppercase)"
-                )
+                suggestions.append(suggestion)
+        else:
+            # Fall back to original suggestion generation
+            for error_key in validation_results["missing_errors"]:
+                # Find the corresponding error details
+                error_details = None
+                for error in requested_errors:
+                    if f"{error.get('type', '').upper()} - {error.get('name', '')}" == error_key:
+                        error_details = error
+                        break
                 
-                # Find class declarations
-                class_bodies = self._find_class_bodies(code)
-                if class_bodies:
-                    class_start, class_end = class_bodies[0]
-                    suggestion["insertion_point"] = class_start + 1  # After class declaration
-                    suggestion["sample_code"] = "private String User_Name; // Improper member naming"
-            
-            elif "MethodName" in error_name:
-                suggestion["suggestions"].append(
-                    "Define a method with improper naming (starting with uppercase)"
-                )
+                if not error_details:
+                    continue
+                    
+                error_type = error_details.get("type", "").lower()
+                error_name = error_details.get("name", "")
                 
-                # Find class declarations
-                class_bodies = self._find_class_bodies(code)
-                if class_bodies:
-                    class_start, class_end = class_bodies[0]
-                    suggestion["insertion_point"] = class_start + 3  # Inside class
-                    suggestion["sample_code"] = "public void PrintMessage() { } // Improper method naming"
-            
-            elif "TypeName" in error_name:
-                suggestion["suggestions"].append(
-                    "Define a class with improper naming (starting with lowercase)"
-                )
+                suggestion = {
+                    "error_key": error_key,
+                    "suggestions": []
+                }
                 
-                # Find insertion point near the top of the file
-                suggestion["insertion_point"] = 5  # Near the top
-                suggestion["sample_code"] = "class myClass { } // Improper class naming"
-            
-            elif "NullPointerException" in error_name:
-                suggestion["suggestions"].append(
-                    "Create an object reference set to null and then call a method on it"
-                )
-                
-                # Find possible insertion points
-                method_bodies = self._find_method_bodies(code)
-                if method_bodies:
-                    method_start, method_end = method_bodies[0]
-                    suggestion["insertion_point"] = method_start + 2  # Inside the method
-                    suggestion["sample_code"] = "String str = null;\nint length = str.length(); // Will cause NullPointerException"
-            
-            elif "String comparison using ==" in error_name:
-                suggestion["suggestions"].append(
-                    "Compare two strings using == instead of equals()"
-                )
-                
-                method_bodies = self._find_method_bodies(code)
-                if method_bodies:
-                    method_start, method_end = method_bodies[0]
-                    suggestion["insertion_point"] = method_start + 2  # Inside the method
-                    suggestion["sample_code"] = """String s1 = "hello";
-String s2 = "h" + "ello";
-if (s1 == s2) { // Using == instead of equals()
-    System.out.println("Strings are equal");
-}"""
-            
-            # Add generic suggestions for any other error types
-            else:
                 # Get implementation guide if available
                 implementation_guide = error_details.get("implementation_guide", "")
                 if implementation_guide:
@@ -271,10 +370,130 @@ if (s1 == s2) { // Using == instead of equals()
                 suggestion["suggestions"].append(
                     f"Look for ways to introduce a {error_name} error in the code"
                 )
-            
-            suggestions.append(suggestion)
+                
+                suggestions.append(suggestion)
         
         return suggestions
+    
+    def generate_improved_prompt(self, code: str, requested_errors: List[Dict[str, Any]], 
+                              evaluation: Dict[str, Any]) -> str:
+        """
+        Generate an improved prompt for the code generator based on LLM evaluation.
+        
+        Args:
+            code: The previously generated code
+            requested_errors: List of errors that should be implemented
+            evaluation: Evaluation results from evaluate_code method
+            
+        Returns:
+            Improved prompt string for the code generator
+        """
+        # Start with the base prompt
+        from utils.code_utils import create_code_generation_prompt
+        
+        # Determine domain from existing code
+        domain = self._infer_domain_from_code(code)
+        
+        # Create base prompt
+        prompt = create_code_generation_prompt(
+            code_length="medium",  # Will be overridden with specifics
+            difficulty_level="medium",  # Will be overridden with specifics
+            selected_errors=requested_errors,
+            domain=domain,
+            include_error_annotations=True
+        )
+        
+        # Add specific guidance based on evaluation
+        prompt += "\n\n## FEEDBACK ON PREVIOUS CODE GENERATION ATTEMPT\n"
+        
+        # If there's LLM feedback, use it
+        if "llm_feedback" in evaluation:
+            prompt += f"\n{evaluation['llm_feedback']}\n"
+        
+        # If there's detailed analysis, use it for more targeted feedback
+        if "detailed_analysis" in evaluation:
+            detailed_analysis = evaluation["detailed_analysis"]
+            
+            # Add information about found errors
+            found_errors = detailed_analysis.get("found_errors", [])
+            if found_errors:
+                prompt += "\n### What was implemented correctly:\n"
+                for error in found_errors:
+                    error_type = error.get("error_type", "")
+                    error_name = error.get("error_name", "")
+                    line_number = error.get("line_number", "Unknown")
+                    code_segment = error.get("code_segment", "")
+                    explanation = error.get("explanation", "")
+                    
+                    prompt += f"-  {error_type} - {error_name}\n"
+                    prompt += f"  Found at line {line_number}: `{code_segment}`\n"
+                    prompt += f"  {explanation}\n"
+            
+            # Add information about missing errors
+            missing_errors = detailed_analysis.get("missing_errors", [])
+            if missing_errors:
+                prompt += "\n### Errors that need to be implemented:\n"
+                
+                for error in missing_errors:
+                    error_type = error.get("error_type", "")
+                    error_name = error.get("error_name", "")
+                    explanation = error.get("explanation", "")
+                    
+                    prompt += f"- L {error_type} - {error_name}\n"
+                    prompt += f"  {explanation}\n"
+                    
+                    # Find the corresponding error details
+                    for req_error in requested_errors:
+                        if (req_error.get("type", "").upper() == error_type and 
+                            req_error.get("name", "") == error_name):
+                            description = req_error.get("description", "")
+                            implementation_guide = req_error.get("implementation_guide", "")
+                            
+                            prompt += f"  Description: {description}\n"
+                            prompt += f"  Implementation guide: {implementation_guide}\n\n"
+        else:
+            # Fall back to original approach
+            if evaluation["found_errors"]:
+                prompt += "\n### What was implemented correctly:\n"
+                for error_key in evaluation["found_errors"]:
+                    prompt += f"-  {error_key}\n"
+                        
+                    # Include the exact line where the error was found, if available
+                    line_num = evaluation["error_locations"].get(error_key, 0)
+                    if line_num > 0:
+                        lines = code.splitlines()
+                        line_content = lines[line_num-1] if 0 < line_num <= len(lines) else "Unknown"
+                        prompt += f"  Found at line {line_num}: `{line_content.strip()}`\n"
+            
+            if evaluation["missing_errors"]:
+                prompt += "\n### Errors that need to be implemented:\n"
+                
+                for error_key in evaluation["missing_errors"]:
+                    prompt += f"- L {error_key}\n"
+                    
+                    # Find the corresponding error details
+                    for error in requested_errors:
+                        if f"{error.get('type', '').upper()} - {error.get('name', '')}" == error_key:
+                            error_type = error.get("type", "").upper()
+                            name = error.get("name", "")
+                            description = error.get("description", "")
+                            implementation_guide = error.get("implementation_guide", "")
+                            
+                            prompt += f"  Description: {description}\n"
+                            prompt += f"  Implementation guide: {implementation_guide}\n\n"
+        
+        prompt += "\n## SPECIFIC INSTRUCTIONS FOR THIS ATTEMPT\n"
+        prompt += "\n1. Please revise the code to implement ALL requested errors. Be sure to follow the implementation guides."
+        prompt += "\n2. Make sure to add error annotations in the standard format: `// ERROR: [TYPE] - [NAME] - [Brief explanation]`"
+        prompt += "\n3. Keep your correct implementations from the previous attempt while adding the missing errors."
+        prompt += "\n4. Focus especially on implementing the missing errors highlighted above."
+        prompt += "\n5. Return your final code in a code block with ``` delimiters."
+        
+        prompt += "\n\nHere's the previous code to improve upon:\n\n```java\n"
+        prompt += code
+        prompt += "\n```"
+        
+        return prompt
     
     def _find_method_bodies(self, code: str) -> List[Tuple[int, int]]:
         """
@@ -348,88 +567,6 @@ if (s1 == s2) { // Using == instead of equals()
         
         return class_bodies
     
-    def generate_improved_prompt(self, code: str, requested_errors: List[Dict[str, Any]], 
-                           evaluation: Dict[str, Any]) -> str:
-        """
-        Generate an improved prompt for the code generator based on evaluation.
-        Enhanced with clearer feedback and specific guidance for missing errors.
-        
-        Args:
-            code: The previously generated code
-            requested_errors: List of errors that should be implemented
-            evaluation: Evaluation results from evaluate_code method
-            
-        Returns:
-            Improved prompt string for the code generator
-        """
-        # Start with the base prompt
-        from utils.code_utils import create_code_generation_prompt
-        
-        # Determine domain from existing code
-        domain = self._infer_domain_from_code(code)
-        
-        # Create base prompt
-        prompt = create_code_generation_prompt(
-            code_length="medium",  # Will be overridden with specifics
-            difficulty_level="medium",  # Will be overridden with specifics
-            selected_errors=requested_errors,
-            domain=domain,
-            include_error_annotations=True
-        )
-        
-        # Add specific guidance based on evaluation
-        prompt += "\n\n## FEEDBACK ON PREVIOUS CODE GENERATION ATTEMPT\n"
-        
-        if evaluation["found_errors"]:
-            prompt += "\n### What was implemented correctly:\n"
-            for error_key in evaluation["found_errors"]:
-                prompt += f"- ✅ {error_key}\n"
-                    
-                # Include the exact line where the error was found, if available
-                line_num = evaluation["error_locations"].get(error_key, 0)
-                if line_num > 0:
-                    lines = code.splitlines()
-                    line_content = lines[line_num-1] if 0 < line_num <= len(lines) else "Unknown"
-                    prompt += f"  Found at line {line_num}: `{line_content.strip()}`\n"
-        
-        if evaluation["missing_errors"]:
-            prompt += "\n### Errors that need to be implemented:\n"
-            
-            for error_key in evaluation["missing_errors"]:
-                prompt += f"- ❌ {error_key}\n"
-                
-                # Find the corresponding error details
-                for error in requested_errors:
-                    if f"{error.get('type', '').upper()} - {error.get('name', '')}" == error_key:
-                        error_type = error.get("type", "").upper()
-                        name = error.get("name", "")
-                        description = error.get("description", "")
-                        implementation_guide = error.get("implementation_guide", "")
-                        
-                        prompt += f"  Description: {description}\n"
-                        prompt += f"  Implementation guide: {implementation_guide}\n\n"
-                        
-                        # Add specific suggestions from the evaluation
-                        for suggestion in evaluation.get("suggestions", []):
-                            if suggestion.get("error_key") == error_key:
-                                for tip in suggestion.get("suggestions", []):
-                                    prompt += f"  Suggestion: {tip}\n"
-                                if "sample_code" in suggestion:
-                                    prompt += f"  Sample code: `{suggestion['sample_code']}`\n\n"
-        
-        prompt += "\n## SPECIFIC INSTRUCTIONS FOR THIS ATTEMPT\n"
-        prompt += "\n1. Please revise the code to implement ALL requested errors. Be sure to follow the implementation guides."
-        prompt += "\n2. Make sure to add error annotations in the standard format: `// ERROR: [TYPE] - [NAME] - [Brief explanation]`"
-        prompt += "\n3. Keep your correct implementations from the previous attempt while adding the missing errors."
-        prompt += "\n4. Focus especially on implementing the missing errors highlighted above."
-        prompt += "\n5. Return your final code in a code block with ``` delimiters."
-        
-        prompt += "\n\nHere's the previous code to improve upon:\n\n```java\n"
-        prompt += code
-        prompt += "\n```"
-        
-        return prompt
-    
     def _infer_domain_from_code(self, code: str) -> str:
         """
         Infer the domain of the code based on class and variable names.
@@ -466,4 +603,4 @@ if (s1 == s2) { // Using == instead of equals()
             if max_domain[1] > 0:
                 return max_domain[0]
         
-        return "general_application"  # Default domain
+        return "general_application"  # Default domain 
