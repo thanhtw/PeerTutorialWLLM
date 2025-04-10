@@ -527,6 +527,7 @@ class JavaCodeReviewGraph:
         
         # Import the validation function
         from utils.error_validation import validate_code_errors
+        from utils.export_utils import export_prompt_response
         
         # Initialize the evaluation agent if not already done
         if not hasattr(self, 'code_evaluation_agent') or self.code_evaluation_agent is None:
@@ -577,7 +578,7 @@ class JavaCodeReviewGraph:
         # Use the code generator to create code with errors
         if hasattr(self.code_generator, 'llm') and self.code_generator.llm:
             # Track attempts to generate proper code with errors
-            max_attempts = 5  # Increased to 5 for more thorough attempts
+            max_attempts = 3  # Reduced to 3 attempts to ensure faster completion
             current_attempt = 0
             best_code = None
             best_validation = None
@@ -640,6 +641,18 @@ class JavaCodeReviewGraph:
                 
                 # Generate code with errors
                 response = self.code_generator.llm.invoke(prompt)
+                
+                # Export the prompt and response for debugging
+                try:
+                    from utils.export_utils import export_prompt_response
+                    export_prompt_response(
+                        prompt=prompt,
+                        response=str(response),
+                        operation_type=f"code_generation_attempt_{current_attempt}",
+                        error_list=selected_errors
+                    )
+                except Exception as export_err:
+                    logger.error(f"Error exporting prompt/response: {str(export_err)}")
                 
                 # Print the LLM response for debugging
                 print(f"\n========== LLM RESPONSE (Attempt {current_attempt}/{max_attempts}) ==========")
@@ -914,7 +927,7 @@ class JavaCodeReviewGraph:
             detailed_problems = [problem1, problem2, problem3]
             
             return annotated_code, clean_code, enhanced_errors, detailed_problems
-    
+
     def _insert_in_main_method(self, code: str, insertion: str) -> str:
         """
         Insert code into the main method of a Java class.
@@ -1116,19 +1129,70 @@ class JavaCodeReviewGraph:
             # Use the code generation feedback to generate improved code
             feedback_prompt = state.code_generation_feedback
             
+            # Export the feedback prompt
+            try:
+                from utils.export_utils import export_prompt_response
+                export_prompt_response(
+                    prompt=feedback_prompt,
+                    response="",
+                    operation_type=f"regeneration_prompt_attempt_{state.evaluation_attempts}",
+                    error_list=requested_errors
+                )
+            except Exception as export_err:
+                logger.error(f"Error exporting regeneration prompt: {str(export_err)}")
+            
             # Log the prompt for debugging
             print("\n========== REGENERATION PROMPT ==========")
             print(feedback_prompt[:500] + "..." if len(feedback_prompt) > 500 else feedback_prompt)
             
             # Generate code with feedback prompt
             if hasattr(self.code_generator, 'llm') and self.code_generator.llm:
+                # Generate code using the improved prompt
                 response = self.code_generator.llm.invoke(feedback_prompt)
+                
+                # Export the response
+                try:
+                    from utils.export_utils import export_prompt_response
+                    export_prompt_response(
+                        prompt=feedback_prompt,
+                        response=str(response),
+                        operation_type=f"regeneration_response_attempt_{state.evaluation_attempts}",
+                        error_list=requested_errors
+                    )
+                except Exception as export_err:
+                    logger.error(f"Error exporting regeneration response: {str(export_err)}")
                 
                 # Extract the code with annotations
                 annotated_code = extract_code_from_response(response)
                 
                 # Create clean version by stripping annotations
                 clean_code = strip_error_annotations(annotated_code)
+                
+                # Evaluate the code immediately to ensure it contains the requested errors
+                # This is the key improvement to ensure evaluation completes within each attempt
+                if self.code_evaluation_agent:
+                    immediate_evaluation = self.code_evaluation_agent.evaluate_code(
+                        clean_code, requested_errors
+                    )
+                    
+                    # Export the immediate evaluation results
+                    try:
+                        from utils.export_utils import export_prompt_response
+                        export_prompt_response(
+                            prompt="", 
+                            response="", 
+                            operation_type=f"immediate_evaluation_attempt_{state.evaluation_attempts}",
+                            error_list=requested_errors,
+                            evaluation_result=immediate_evaluation
+                        )
+                    except Exception as export_err:
+                        logger.error(f"Error exporting immediate evaluation: {str(export_err)}")
+                    
+                    # Print immediate evaluation results for debugging
+                    print("\n========== IMMEDIATE EVALUATION RESULTS ==========")
+                    print(f"Valid: {immediate_evaluation.get('valid', False)}")
+                    print(f"Found Errors: {len(immediate_evaluation.get('found_errors', []))} of {len(requested_errors)}")
+                    print(f"Missing Errors: {immediate_evaluation.get('missing_errors', [])}")
                 
                 # Enrich the error information 
                 enhanced_errors, detailed_problems = enrich_error_information(
@@ -1146,6 +1210,10 @@ class JavaCodeReviewGraph:
                     },
                     enhanced_errors=enhanced_errors
                 )
+                
+                # Store the evaluation result in the state for immediate feedback
+                if self.code_evaluation_agent:
+                    state.evaluation_result = immediate_evaluation
                 
                 # Move to evaluation step again
                 state.current_step = "evaluate"

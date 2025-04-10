@@ -12,6 +12,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from langchain_core.language_models import BaseLanguageModel
 
 from utils.error_validation import validate_code_errors, is_comment, is_primitive_or_common
+from utils.export_utils import export_prompt_response  # Import the new utility
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,15 +27,17 @@ class CodeEvaluationAgent:
     code generator. Can use an LLM for more accurate evaluation.
     """
     
-    def __init__(self, llm: BaseLanguageModel = None):
+    def __init__(self, llm: BaseLanguageModel = None, export_debug: bool = True):
         """
         Initialize the CodeEvaluationAgent with optional LLM.
         
         Args:
             llm: Optional language model for evaluation
+            export_debug: Whether to export prompts and responses to files
         """
         logger.info("Initializing Code Evaluation Agent")
         self.llm = llm
+        self.export_debug = export_debug
         if llm:
             logger.info("LLM provided for code evaluation")
         else:
@@ -170,6 +173,15 @@ Be thorough and precise in your analysis, ensuring that you identify exactly whe
             # Get response from LLM
             response = self.llm.invoke(prompt)
             
+            # Export the prompt and response if export_debug is enabled
+            if self.export_debug:
+                export_prompt_response(
+                    prompt=prompt, 
+                    response=str(response), 
+                    operation_type="code_evaluation",
+                    error_list=requested_errors
+                )
+            
             # Extract JSON from response
             import re
             import json
@@ -233,6 +245,16 @@ Be thorough and precise in your analysis, ensuring that you identify exactly whe
                 "llm_feedback": analysis.get("feedback", ""),
                 "detailed_analysis": analysis  # Keep the full LLM analysis for detailed feedback
             }
+            
+            # Export the evaluation results if export_debug is enabled
+            if self.export_debug:
+                export_prompt_response(
+                    prompt="", 
+                    response="", 
+                    operation_type="evaluation_results",
+                    error_list=requested_errors,
+                    evaluation_result=validation_results
+                )
             
             return validation_results
             
@@ -439,7 +461,7 @@ Be thorough and precise in your analysis, ensuring that you identify exactly whe
                     error_name = error.get("error_name", "")
                     explanation = error.get("explanation", "")
                     
-                    prompt += f"- L {error_type} - {error_name}\n"
+                    prompt += f"- {error_type} - {error_name}\n"
                     prompt += f"  {explanation}\n"
                     
                     # Find the corresponding error details
@@ -469,7 +491,7 @@ Be thorough and precise in your analysis, ensuring that you identify exactly whe
                 prompt += "\n### Errors that need to be implemented:\n"
                 
                 for error_key in evaluation["missing_errors"]:
-                    prompt += f"- L {error_key}\n"
+                    prompt += f"- {error_key}\n"
                     
                     # Find the corresponding error details
                     for error in requested_errors:
@@ -492,6 +514,16 @@ Be thorough and precise in your analysis, ensuring that you identify exactly whe
         prompt += "\n\nHere's the previous code to improve upon:\n\n```java\n"
         prompt += code
         prompt += "\n```"
+        
+        # Export the improved prompt if export_debug is enabled
+        if self.export_debug:
+            export_prompt_response(
+                prompt=prompt, 
+                response="", 
+                operation_type="improved_generation_prompt",
+                error_list=requested_errors,
+                evaluation_result=evaluation
+            )
         
         return prompt
     

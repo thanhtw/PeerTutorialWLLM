@@ -993,11 +993,38 @@ def render_feedback_tab(workflow, feedback_display_ui):
         on_reset_callback=handle_reset
     )
 
+def ensure_exports_directory_exists():
+    """Ensure that the exports directory exists for debugging output."""
+    try:
+        # Get the current directory (where app.py is located)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        exports_dir = os.path.join(current_dir, "exports")
+        
+        # Create the directory if it doesn't exist
+        if not os.path.exists(exports_dir):
+            os.makedirs(exports_dir)
+            logger.info(f"Created exports directory at {exports_dir}")
+        
+        # Add a .gitignore file to exclude exported files from version control
+        gitignore_path = os.path.join(exports_dir, ".gitignore")
+        if not os.path.exists(gitignore_path):
+            with open(gitignore_path, 'w') as f:
+                f.write("# Ignore all files in this directory\n*\n# Except this file\n!.gitignore\n")
+                
+        return exports_dir
+    except Exception as e:
+        logger.error(f"Error creating exports directory: {str(e)}")
+        return None
 
 def main():
     """Enhanced main application function."""
     # Initialize session state
     init_session_state()
+    
+    # Ensure exports directory exists for debugging
+    exports_dir = ensure_exports_directory_exists()
+    if exports_dir:
+        logger.info(f"Export directory available at: {exports_dir}")
     
     # Initialize LLM manager and workflow
     llm_manager = LLMManager()
@@ -1049,6 +1076,56 @@ def main():
     
     with tabs[2]:
         render_feedback_tab(workflow, feedback_display_ui)
+        
+    # Add access to exports directory
+    if st.sidebar.checkbox("Show Debug Export Controls", value=False):
+        with st.sidebar.expander("Debug Export Options"):
+            st.write("### Prompt & Response Exports")
+            st.info(f"Exports are saved to: {exports_dir}")
+            
+            # Option to toggle export debugging
+            export_enabled = st.checkbox(
+                "Enable Export Debugging", 
+                value=True,
+                help="Export prompts and LLM responses to text files for debugging"
+            )
+            
+            # Set export debugging flag in workflow code evaluation agent
+            if hasattr(workflow, 'code_evaluation_agent') and workflow.code_evaluation_agent:
+                workflow.code_evaluation_agent.export_debug = export_enabled
+            
+            # Add a button to open the exports directory
+            if st.button("Open Exports Directory"):
+                try:
+                    import platform
+                    import subprocess
+                    
+                    system = platform.system()
+                    if system == "Windows":
+                        os.startfile(exports_dir)
+                    elif system == "Darwin":  # macOS
+                        subprocess.call(["open", exports_dir])
+                    else:  # Linux
+                        subprocess.call(["xdg-open", exports_dir])
+                        
+                    st.success("Opened exports directory")
+                except Exception as e:
+                    st.error(f"Error opening exports directory: {str(e)}")
+            
+            # Add button to list export files
+            if st.button("List Export Files"):
+                try:
+                    files = [f for f in os.listdir(exports_dir) if f.endswith('.txt')]
+                    if files:
+                        st.write(f"Found {len(files)} export files:")
+                        for file in sorted(files, reverse=True)[:10]:  # Show the 10 most recent
+                            st.text(file)
+                        if len(files) > 10:
+                            st.text(f"...and {len(files) - 10} more")
+                    else:
+                        st.info("No export files found")
+                except Exception as e:
+                    st.error(f"Error listing export files: {str(e)}")
 
 if __name__ == "__main__":
     main()
