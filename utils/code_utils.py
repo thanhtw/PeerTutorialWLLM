@@ -145,8 +145,16 @@ def extract_code_from_response(response: str) -> str:
         return ""
         
     # Try to extract code from code blocks
-    #code_blocks = re.findall(r'```(?:java)?\s*(.*?)\s*```', response, re.DOTALL)(r'```java\s*(.*?)\s*```java', response, re.DOTALL)
-    code_blocks = re.findall(r'```java\s*(.*?)\s*```java', response, re.DOTALL)
+    import re
+    
+    # First try to match code blocks with proper Java syntax highlighting
+    code_blocks = re.findall(r'```java\s*(.*?)\s*```', response, re.DOTALL)
+    if code_blocks:
+        # Return the largest code block
+        return max(code_blocks, key=len)
+    
+    # If that fails, try to match any code blocks
+    code_blocks = re.findall(r'```\s*(.*?)\s*```', response, re.DOTALL)
     if code_blocks:
         # Return the largest code block
         return max(code_blocks, key=len)

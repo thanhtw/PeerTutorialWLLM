@@ -38,6 +38,34 @@ def is_error_annotation(line: str) -> bool:
     line_lower = line.lower()
     return any(keyword in line_lower for keyword in error_keywords)
 
+def is_error_annotation(line: str) -> bool:
+    """
+    Check if a line is an error annotation comment.
+    Works consistently across all selection modes (Standard, Advanced, and Specific).
+    
+    Args:
+        line: The line to check
+        
+    Returns:
+        True if the line is an error annotation comment, False otherwise
+    """
+    line = line.strip()
+    
+    # Check if it's a comment at all
+    if not line.startswith("//"):
+        return False
+    
+    # Look for error-related keywords
+    error_keywords = [
+        "error", "issue", "bug", "warning", "problem",
+        "todo", "fixme", "error type", "category", "description",
+        "problem area", "error category", "specific error",
+        "build error", "checkstyle error", "logic error", "style error"
+    ]
+    
+    line_lower = line.lower()
+    return any(keyword in line_lower for keyword in error_keywords)
+
 def extract_error_locations(
     code: str,
     errors: List[Dict[str, Any]]
@@ -196,19 +224,6 @@ def extract_error_locations(
                         error_info["context"] = "\n".join(lines[context_start:context_end])
                         print(f"  Found member naming issue at line {i+1}")
                         break
-            
-            # 5. Method Name Conventions
-            elif "methodname" in error_name.lower():
-                for i, line in enumerate(lines):
-                    # Look for method declarations with improper naming (starting with uppercase)
-                    if re.search(r'\b(private|protected|public)\s+\w+\s+[A-Z]\w*\s*\(', line):
-                        error_info["line_number"] = i + 1
-                        error_info["line_content"] = line.strip()
-                        context_start = max(0, i - 1)
-                        context_end = min(len(lines), i + 2)
-                        error_info["context"] = "\n".join(lines[context_start:context_end])
-                        print(f"  Found method naming issue at line {i+1}")
-                        break
         
         # If we still haven't found a location, use a more intelligent default
         if not error_info["line_number"]:
@@ -363,7 +378,13 @@ def generate_problem_descriptions(enhanced_errors: List[Dict[str, Any]]) -> List
         
         # Create a detailed problem description
         if line_number and line_content:
-            problem = f"{error_type} ERROR - {name}: {description} (Line {line_number}: '{line_content}')"
+            # Clean up the line content for display
+            clean_content = line_content.strip()
+            # Truncate if too long
+            if len(clean_content) > 40:
+                clean_content = clean_content[:40] + "..."
+                
+            problem = f"{error_type} ERROR - {name}: {description} (Line {line_number}: '{clean_content}')"
         else:
             problem = f"{error_type} ERROR - {name}: {description}"
         
@@ -589,7 +610,7 @@ def enrich_error_information(
     print("\n========== ERROR ENRICHMENT COMPLETE ==========")
     return enhanced_errors, problem_descriptions
 
-def generate_problem_descriptions(enhanced_errors: List[Dict[str, Any]]) -> List[str]:
+
     """
     Generate detailed problem descriptions from enhanced error information.
     

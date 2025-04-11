@@ -10,7 +10,7 @@ import logging
 import json
 from typing import List, Dict, Any, Optional
 from langchain_core.language_models import BaseLanguageModel
-from utils.export_utils import export_prompt_response
+from utils.improved_export_utils import export_prompt_response  # Changed from export_utils to improved_export_utils
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -185,10 +185,11 @@ Please ensure your response contains ONLY the JSON object described above, with 
             if self.export_debug:
                 export_prompt_response(
                     prompt=prompt, 
-                    response=str(response), 
+                    response=json.dumps(validation_results, indent=2), 
                     operation_type="code_evaluation",
                     session_id=session_id,
-                    error_list=requested_errors
+                    error_list=requested_errors,
+                    evaluation_result=validation_results
                 )
             
             # Extract JSON from response
@@ -264,7 +265,7 @@ Please ensure your response contains ONLY the JSON object described above, with 
                 if self.export_debug:
                     export_prompt_response(
                         prompt="", 
-                        response="", 
+                        response=json.dumps(validation_results, indent=2), 
                         operation_type="evaluation_results",
                         session_id=session_id,
                         error_list=requested_errors,
