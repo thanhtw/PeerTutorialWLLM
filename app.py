@@ -31,7 +31,7 @@ if current_dir not in sys.path:
     sys.path.append(current_dir)
 
 # Import LangGraph components
-from langgraph_workflow import JavaCodeReviewGraph
+#from langgraph_workflow import JavaCodeReviewGraph
 from state_schema import WorkflowState
 
 # Import UI components
@@ -45,6 +45,7 @@ from llm_manager import LLMManager
 
 # Import data access
 from data.json_error_repository import JsonErrorRepository
+from improved_langgraph_workflow  import ImprovedJavaCodeReviewGraph
 
 # Load environment variables
 load_dotenv()
@@ -84,7 +85,7 @@ def init_session_state():
     if 'sidebar_tab' not in st.session_state:
         st.session_state.sidebar_tab = "Status"
 
-def generate_code_problem(workflow: JavaCodeReviewGraph, 
+def generate_code_problem(workflow: ImprovedJavaCodeReviewGraph, 
                          params: Dict[str, str], 
                          error_selection_mode: str,
                          selected_error_categories: Dict[str, List[str]],
@@ -253,7 +254,7 @@ def generate_code_problem(workflow: JavaCodeReviewGraph,
         st.error(f"Error generating code problem: {str(e)}")
         return False
 
-def process_student_review(workflow: JavaCodeReviewGraph, student_review: str):
+def process_student_review(workflow: ImprovedJavaCodeReviewGraph, student_review: str):
     """
     Process a student review with progress indicator and improved error handling.
     
@@ -348,7 +349,7 @@ def process_student_review(workflow: JavaCodeReviewGraph, student_review: str):
             st.session_state.error = error_msg
             return False
 
-def render_sidebar(llm_manager: LLMManager, workflow: JavaCodeReviewGraph):
+def render_sidebar(llm_manager: LLMManager, workflow: ImprovedJavaCodeReviewGraph):
     """
     Render the sidebar with status and settings.
     """
@@ -601,7 +602,7 @@ def render_status_sidebar(llm_manager: LLMManager):
         unsafe_allow_html=True
     )
 
-def render_settings_sidebar(workflow: JavaCodeReviewGraph):
+def render_settings_sidebar(workflow: ImprovedJavaCodeReviewGraph):
     """Render the settings sidebar tab"""
     st.header("Review Settings")
     
@@ -1028,7 +1029,7 @@ def main():
     
     # Initialize LLM manager and workflow
     llm_manager = LLMManager()
-    workflow = JavaCodeReviewGraph(llm_manager)
+    workflow = ImprovedJavaCodeReviewGraph(llm_manager)
     
     # Initialize UI components
     error_selector_ui = ErrorSelectorUI()
