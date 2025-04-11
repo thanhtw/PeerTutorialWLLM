@@ -4,14 +4,8 @@ State Schema for Java Code Review Training System.
 This module defines the state schema for the LangGraph-based workflow.
 """
 
-__all__ = ['WorkflowState', 'CodeSnippet', 'ReviewAttempt']
-
-from typing import List, Dict, Any, Optional, TypedDict, Literal
+from typing import List, Dict, Any, Optional, Literal
 from pydantic import BaseModel, Field
-
-# Update the CodeSnippet class in state_schema.py
-
-
 
 class CodeSnippet(BaseModel):
     """Schema for code snippet data"""
@@ -31,7 +25,7 @@ class ReviewAttempt(BaseModel):
 class WorkflowState(BaseModel):
     """The state for the Java Code Review workflow"""
     # Current workflow step
-    current_step: Literal["generate", "review", "analyze", "summarize", "complete"] = Field(
+    current_step: Literal["generate", "evaluate", "regenerate", "review", "analyze", "summarize", "complete"] = Field(
         "generate", description="Current step in the workflow"
     )
     
@@ -39,11 +33,17 @@ class WorkflowState(BaseModel):
     code_length: str = Field("medium", description="Length of code (short, medium, long)")
     difficulty_level: str = Field("medium", description="Difficulty level (easy, medium, hard)")
     
-    # IMPORTANT: Replace underscore field with properly named field
-    # Use a single field with a clear name
+    # Error selection mode
+    error_selection_mode: str = Field("standard", description="Mode for error selection (standard, advanced, specific)")
+    
+    # Error categories and specific errors
     selected_error_categories: Dict[str, List[str]] = Field(
         default_factory=lambda: {"build": [], "checkstyle": []}, 
         description="Selected error categories"
+    )
+    selected_specific_errors: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Specific errors selected in 'specific' mode"
     )
     
     # Code data
@@ -59,13 +59,11 @@ class WorkflowState(BaseModel):
     review_summary: Optional[str] = Field(None, description="Final review summary")
     comparison_report: Optional[str] = Field(None, description="Comparison report")
     
+    # Code evaluation fields
+    evaluation_result: Optional[Dict[str, Any]] = Field(None, description="Results from code evaluation")
+    evaluation_attempts: int = Field(0, description="Number of attempts to generate code")
+    max_evaluation_attempts: int = Field(3, description="Maximum number of code generation attempts")
+    code_generation_feedback: Optional[str] = Field(None, description="Feedback for code generation")
+    
     # Error handling
     error: Optional[str] = Field(None, description="Error message if any")
-
-    evaluation_result: Optional[Dict[str, Any]] = Field(None, description="Results from code evaluation")
-
-    evaluation_attempts: int = Field(0, description="Number of attempts to generate code")
-
-    max_evaluation_attempts: int = Field(3, description="Maximum number of code generation attempts")
-
-    code_generation_feedback: Optional[str] = Field(None, description="Feedback for code generation")

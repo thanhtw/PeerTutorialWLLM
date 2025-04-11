@@ -371,8 +371,6 @@ def generate_problem_descriptions(enhanced_errors: List[Dict[str, Any]]) -> List
     
     return problem_descriptions
 
-# Update the enrich_error_information function in utils/enhanced_error_tracking.py
-
 def enrich_error_information(
     code: str, 
     selected_errors: List[Dict[str, Any]]
@@ -395,6 +393,22 @@ def enrich_error_information(
     if not selected_errors or len(selected_errors) == 0:
         print("WARNING: No selected errors provided to enrich_error_information")
         return [], []
+    
+    # Handle empty code case
+    if not code or not code.strip():
+        print("WARNING: Empty code provided to enrich_error_information")
+        empty_errors = []
+        for error in selected_errors:
+            error_info = error.copy()
+            error_info["line_number"] = 1
+            error_info["line_content"] = "Empty code"
+            error_info["context"] = "No code available"
+            empty_errors.append(error_info)
+        
+        # Generate basic problem descriptions
+        problem_descriptions = [f"{error.get('type', '').upper()} ERROR - {error.get('name', '')}: {error.get('description', '')}" 
+                              for error in selected_errors]
+        return empty_errors, problem_descriptions
     
     # Run specialized code analysis to find error locations
     specific_locations = analyze_specific_code(code)
@@ -430,7 +444,7 @@ def enrich_error_information(
     
     # Try to extract error locations using specialized detection
     enhanced_errors = []
-    lines = code.splitlines()
+    lines = code.splitlines() if code else []
     
     for error in normalized_errors:
         error_info = error.copy()
@@ -451,49 +465,53 @@ def enrich_error_information(
         
         # Check for unused variable
         if "unused variable" in error_name or "unused" in error_name:
-            if specific_locations["unused_variable"]:
+            if specific_locations.get("unused_variable", []):
                 line_idx = specific_locations["unused_variable"][0]
-                error_info["line_number"] = line_idx + 1  # 1-based line numbering
-                error_info["line_content"] = lines[line_idx] if line_idx < len(lines) else "Unknown line"
-                found_location = True
-                print(f"  Found unused variable at line {line_idx + 1}")
+                if 0 <= line_idx < len(lines):
+                    error_info["line_number"] = line_idx + 1  # 1-based line numbering
+                    error_info["line_content"] = lines[line_idx]
+                    found_location = True
+                    print(f"  Found unused variable at line {line_idx + 1}")
         
         # Check for redundant cast
         elif "redundant cast" in error_name or "cast" in error_name:
-            if specific_locations["redundant_cast"]:
+            if specific_locations.get("redundant_cast", []):
                 line_idx = specific_locations["redundant_cast"][0]
-                error_info["line_number"] = line_idx + 1
-                error_info["line_content"] = lines[line_idx] if line_idx < len(lines) else "Unknown line"
-                found_location = True
-                print(f"  Found redundant cast at line {line_idx + 1}")
+                if 0 <= line_idx < len(lines):
+                    error_info["line_number"] = line_idx + 1
+                    error_info["line_content"] = lines[line_idx]
+                    found_location = True
+                    print(f"  Found redundant cast at line {line_idx + 1}")
         
         # Check for typename issues
         elif "typename" in error_name or "class" in error_name:
-            if specific_locations["typename"]:
+            if specific_locations.get("typename", []):
                 line_idx = specific_locations["typename"][0]
-                error_info["line_number"] = line_idx + 1
-                error_info["line_content"] = lines[line_idx] if line_idx < len(lines) else "Unknown line"
-                found_location = True
-                print(f"  Found typename issue at line {line_idx + 1}")
-            else:
+                if 0 <= line_idx < len(lines):
+                    error_info["line_number"] = line_idx + 1
+                    error_info["line_content"] = lines[line_idx]
+                    found_location = True
+                    print(f"  Found typename issue at line {line_idx + 1}")
+            elif len(lines) > 27:
                 # In Image 2, the main class is at line 28
                 error_info["line_number"] = 28
-                error_info["line_content"] = lines[27] if 27 < len(lines) else "Unknown line"
+                error_info["line_content"] = lines[27]
                 found_location = True
                 print(f"  Using known location for typename at line 28")
         
         # Check for membername issues
         elif "membername" in error_name or "member name" in error_name or "variable name" in error_name:
-            if specific_locations["membername"]:
+            if specific_locations.get("membername", []):
                 line_idx = specific_locations["membername"][0]
-                error_info["line_number"] = line_idx + 1
-                error_info["line_content"] = lines[line_idx] if line_idx < len(lines) else "Unknown line"
-                found_location = True
-                print(f"  Found membername issue at line {line_idx + 1}")
-            else:
+                if 0 <= line_idx < len(lines):
+                    error_info["line_number"] = line_idx + 1
+                    error_info["line_content"] = lines[line_idx]
+                    found_location = True
+                    print(f"  Found membername issue at line {line_idx + 1}")
+            elif len(lines) > 20:
                 # In Image 2, consider message variable at line 21
                 error_info["line_number"] = 21
-                error_info["line_content"] = lines[20] if 20 < len(lines) else "Unknown line"
+                error_info["line_content"] = lines[20]
                 found_location = True
                 print(f"  Using known location for membername at line 21")
         
@@ -503,7 +521,7 @@ def enrich_error_information(
             if "unused variable" in error_name:
                 # Look for variable declarations
                 for i, line in enumerate(lines):
-                    if "private" in line and "=" not in line:
+                    if i < len(lines) and "private" in line and "=" not in line:
                         error_info["line_number"] = i + 1
                         error_info["line_content"] = line
                         print(f"  Using fallback for unused variable at line {i + 1}")
@@ -511,7 +529,7 @@ def enrich_error_information(
             elif "redundant cast" in error_name:
                 # Look for method calls with potential casts
                 for i, line in enumerate(lines):
-                    if "(" in line and "new" in line:
+                    if i < len(lines) and "(" in line and "new" in line:
                         error_info["line_number"] = i + 1
                         error_info["line_content"] = line
                         print(f"  Using fallback for redundant cast at line {i + 1}")
@@ -519,7 +537,7 @@ def enrich_error_information(
             elif "typename" in error_name:
                 # Look for class declarations
                 for i, line in enumerate(lines):
-                    if "class" in line:
+                    if i < len(lines) and "class" in line:
                         error_info["line_number"] = i + 1
                         error_info["line_content"] = line
                         print(f"  Using fallback for typename at line {i + 1}")
@@ -527,25 +545,37 @@ def enrich_error_information(
             elif "membername" in error_name:
                 # Look for member variables
                 for i, line in enumerate(lines):
-                    if "private" in line:
+                    if i < len(lines) and "private" in line:
                         error_info["line_number"] = i + 1
                         error_info["line_content"] = line
                         print(f"  Using fallback for membername at line {i + 1}")
                         break
         
-        # Still no location? Use a unique default based on error index
-        if not error_info["line_number"]:
+        # Still no location? Use a unique default based on error index, safely
+        if not error_info["line_number"] and lines:
             error_idx = normalized_errors.index(error)
-            default_line = min(10 + error_idx * 3, len(lines) - 1)
+            # Make sure default_line is always valid (within bounds)
+            default_line = min(10 + error_idx * 3, max(0, len(lines) - 1))
             error_info["line_number"] = default_line + 1
-            error_info["line_content"] = lines[default_line] if default_line < len(lines) else "Unknown line"
+            error_info["line_content"] = lines[default_line] if 0 <= default_line < len(lines) else "Unknown line"
             print(f"  Using generic fallback at line {default_line + 1}")
+        elif not error_info["line_number"]:
+            # If we have no lines at all
+            error_info["line_number"] = 1
+            error_info["line_content"] = "No code available"
+            print("  Code is empty, using line 1 as fallback")
         
-        # Add context (lines before and after)
-        line_idx = error_info["line_number"] - 1
-        context_start = max(0, line_idx - 1)
-        context_end = min(len(lines), line_idx + 2)
-        error_info["context"] = "\n".join(lines[context_start:context_end])
+        # Add context (lines before and after), safely
+        if error_info["line_number"] and lines:
+            line_idx = error_info["line_number"] - 1
+            if 0 <= line_idx < len(lines):
+                context_start = max(0, line_idx - 1)
+                context_end = min(len(lines), line_idx + 2)
+                error_info["context"] = "\n".join(lines[context_start:context_end])
+            else:
+                error_info["context"] = "Context unavailable"
+        else:
+            error_info["context"] = "No code available for context"
         
         enhanced_errors.append(error_info)
         

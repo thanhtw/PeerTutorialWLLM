@@ -3,16 +3,13 @@ Code Evaluation Agent for Java Peer Review Training System.
 
 This module provides the CodeEvaluationAgent class which evaluates 
 generated Java code to ensure it contains the required errors.
-Uses an LLM for more accurate analysis when available.
+Uses an LLM for evaluation with no regex fallback.
 """
 
-import re
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from langchain_core.language_models import BaseLanguageModel
-
-from utils.error_validation import validate_code_errors, is_comment, is_primitive_or_common
-from utils.export_utils import export_prompt_response  # Import the new utility
+from utils.export_utils import export_prompt_response
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +21,7 @@ class CodeEvaluationAgent:
     
     This agent provides detailed feedback on how well the generated code
     implements the required errors, and suggests improvements for the
-    code generator. Can use an LLM for more accurate evaluation.
+    code generator. Uses only LLM for evaluation, with no regex fallback.
     """
     
     def __init__(self, llm: BaseLanguageModel = None, export_debug: bool = True):
@@ -41,11 +38,12 @@ class CodeEvaluationAgent:
         if llm:
             logger.info("LLM provided for code evaluation")
         else:
-            logger.info("No LLM provided, will use regex-based validation")
+            logger.info("No LLM provided - evaluation capabilities will be limited")
     
     def evaluate_code(self, code: str, requested_errors: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Evaluate generated code against requested errors with detailed feedback.
+        Uses only LLM-based evaluation.
         
         Args:
             code: The generated Java code
@@ -57,27 +55,34 @@ class CodeEvaluationAgent:
         try:
             logger.info(f"Evaluating code with {len(requested_errors)} requested errors")
             
-            # Use LLM-based evaluation if available, otherwise fall back to regex-based validation
+            # Use LLM-based evaluation if available
             if self.llm:
                 validation_results = self._evaluate_with_llm(code, requested_errors)
                 logger.info("Using LLM for code evaluation")
             else:
-                validation_results = validate_code_errors(code, requested_errors)
-                logger.info("Using regex-based validation (LLM not available)")
+                logger.warning("No LLM provided for evaluation, returning basic results")
+                # Return a basic structure without evaluation
+                return {
+                    "valid": False,
+                    "found_errors": [],
+                    "missing_errors": [f"{error.get('type', '').upper()} - {error.get('name', '')}" 
+                                    for error in requested_errors],
+                    "error_locations": {},
+                    "feedback": "No LLM available for evaluation",
+                    "suggestions": []
+                }
             
             # Create more detailed evaluation
             evaluation = {
                 "valid": validation_results["valid"],
                 "found_errors": validation_results["found_errors"],
                 "missing_errors": validation_results["missing_errors"],
-                "error_locations": validation_results["error_locations"],
-                "feedback": self._generate_feedback(code, requested_errors, validation_results),
+                "error_locations": validation_results.get("error_locations", {}),
+                "feedback": validation_results.get("llm_feedback", "No feedback available"),
                 "suggestions": self._generate_suggestions(code, requested_errors, validation_results)
             }
             
-            # Include LLM feedback if available
-            if "llm_feedback" in validation_results:
-                evaluation["llm_feedback"] = validation_results["llm_feedback"]
+            # Include additional LLM analysis if available
             if "detailed_analysis" in validation_results:
                 evaluation["detailed_analysis"] = validation_results["detailed_analysis"]
             
@@ -109,8 +114,15 @@ class CodeEvaluationAgent:
             Dictionary with evaluation results
         """
         if not self.llm:
-            logger.warning("No LLM provided for evaluation, falling back to regex-based validation")
-            return validate_code_errors(code, requested_errors)
+            logger.warning("No LLM provided for evaluation")
+            return {
+                "valid": False,
+                "found_errors": [],
+                "missing_errors": [f"{error.get('type', '').upper()} - {error.get('name', '')}" 
+                                for error in requested_errors],
+                "error_locations": {},
+                "llm_feedback": "No LLM available for evaluation"
+            }
         
         # Format the requested errors for the prompt
         error_descriptions = []
@@ -193,7 +205,15 @@ Be thorough and precise in your analysis, ensuring that you identify exactly whe
                     analysis = json.loads(json_str)
                 except json.JSONDecodeError:
                     logger.error("Failed to parse JSON from LLM response")
-                    return validate_code_errors(code, requested_errors)
+                    # Return basic structure instead of falling back to regex
+                    return {
+                        "valid": False,
+                        "found_errors": [],
+                        "missing_errors": [f"{error.get('type', '').upper()} - {error.get('name', '')}" 
+                                        for error in requested_errors],
+                        "error_locations": {},
+                        "llm_feedback": "Error parsing LLM response"
+                    }
             else:
                 # Try to find any JSON object in the response
                 json_match = re.search(r'({[\s\S]*})', response)
@@ -203,10 +223,26 @@ Be thorough and precise in your analysis, ensuring that you identify exactly whe
                         analysis = json.loads(json_str)
                     except json.JSONDecodeError:
                         logger.error("Failed to parse JSON from LLM response")
-                        return validate_code_errors(code, requested_errors)
+                        # Return basic structure instead of falling back to regex
+                        return {
+                            "valid": False,
+                            "found_errors": [],
+                            "missing_errors": [f"{error.get('type', '').upper()} - {error.get('name', '')}" 
+                                            for error in requested_errors],
+                            "error_locations": {},
+                            "llm_feedback": "Error parsing LLM response"
+                        }
                 else:
                     logger.error("No JSON found in LLM response")
-                    return validate_code_errors(code, requested_errors)
+                    # Return basic structure instead of falling back to regex
+                    return {
+                        "valid": False,
+                        "found_errors": [],
+                        "missing_errors": [f"{error.get('type', '').upper()} - {error.get('name', '')}" 
+                                        for error in requested_errors],
+                        "error_locations": {},
+                        "llm_feedback": "No JSON found in LLM response"
+                    }
             
             # Process the analysis results
             found_errors = []
@@ -238,7 +274,7 @@ Be thorough and precise in your analysis, ensuring that you identify exactly whe
             
             # Create the validation result
             validation_results = {
-                "valid": analysis.get("valid", False),
+                "valid": len(missing_errors) == 0,  # Valid only if no errors are missing
                 "found_errors": found_errors,
                 "missing_errors": missing_errors,
                 "error_locations": error_locations,
@@ -260,66 +296,15 @@ Be thorough and precise in your analysis, ensuring that you identify exactly whe
             
         except Exception as e:
             logger.error(f"Error evaluating code with LLM: {str(e)}")
-            # Fall back to regex-based validation
-            return validate_code_errors(code, requested_errors)
-    
-    def _generate_feedback(self, code: str, requested_errors: List[Dict[str, Any]], 
-                         validation_results: Dict[str, Any]) -> str:
-        """
-        Generate detailed feedback on the implementation of errors.
-        
-        Args:
-            code: The generated Java code
-            requested_errors: List of errors that should be implemented
-            validation_results: Results from validation
-            
-        Returns:
-            Detailed feedback string
-        """
-        # If LLM feedback is available, use it
-        if "llm_feedback" in validation_results and validation_results["llm_feedback"]:
-            return validation_results["llm_feedback"]
-        
-        # Otherwise, use the original feedback generation logic
-        lines = code.splitlines()
-        feedback = []
-        
-        # Provide feedback on correctly implemented errors
-        if validation_results["found_errors"]:
-            feedback.append("Successfully implemented errors:")
-            for error_key in validation_results["found_errors"]:
-                line_num = validation_results["error_locations"].get(error_key, 0)
-                line_content = lines[line_num-1] if 0 < line_num <= len(lines) else "Unknown"
-                feedback.append(f"- {error_key} (Line {line_num}: '{line_content.strip()}')")
-        
-        # Provide feedback on missing errors
-        if validation_results["missing_errors"]:
-            feedback.append("\nErrors that need implementation:")
-            for error_key in validation_results["missing_errors"]:
-                # Find the corresponding error details
-                error_details = None
-                for error in requested_errors:
-                    if f"{error.get('type', '').upper()} - {error.get('name', '')}" == error_key:
-                        error_details = error
-                        break
-                
-                if error_details:
-                    implementation_guide = error_details.get("implementation_guide", "No implementation guide available")
-                    feedback.append(f"- {error_key}")
-                    feedback.append(f"  Implementation guide: {implementation_guide}")
-                else:
-                    feedback.append(f"- {error_key} (Details not available)")
-        
-        # Overall assessment
-        if validation_results["valid"]:
-            feedback.append("\nAll requested errors have been successfully implemented in the code.")
-        else:
-            found_count = len(validation_results["found_errors"])
-            total_count = len(requested_errors)
-            feedback.append(f"\nImplemented {found_count} out of {total_count} requested errors "
-                          f"({found_count/total_count*100:.1f}%).")
-            
-        return "\n".join(feedback)
+            # Return a basic structure without falling back to regex
+            return {
+                "valid": False,
+                "found_errors": [],
+                "missing_errors": [f"{error.get('type', '').upper()} - {error.get('name', '')}" 
+                                for error in requested_errors],
+                "error_locations": {},
+                "llm_feedback": f"Error evaluating with LLM: {str(e)}"
+            }
     
     def _generate_suggestions(self, code: str, requested_errors: List[Dict[str, Any]], 
                             validation_results: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -363,7 +348,7 @@ Be thorough and precise in your analysis, ensuring that you identify exactly whe
                 
                 suggestions.append(suggestion)
         else:
-            # Fall back to original suggestion generation
+            # Fallback to simple suggestions
             for error_key in validation_results["missing_errors"]:
                 # Find the corresponding error details
                 error_details = None
@@ -474,18 +459,11 @@ Be thorough and precise in your analysis, ensuring that you identify exactly whe
                             prompt += f"  Description: {description}\n"
                             prompt += f"  Implementation guide: {implementation_guide}\n\n"
         else:
-            # Fall back to original approach
+            # Fall back to simple approach
             if evaluation["found_errors"]:
                 prompt += "\n### What was implemented correctly:\n"
                 for error_key in evaluation["found_errors"]:
                     prompt += f"-  {error_key}\n"
-                        
-                    # Include the exact line where the error was found, if available
-                    line_num = evaluation["error_locations"].get(error_key, 0)
-                    if line_num > 0:
-                        lines = code.splitlines()
-                        line_content = lines[line_num-1] if 0 < line_num <= len(lines) else "Unknown"
-                        prompt += f"  Found at line {line_num}: `{line_content.strip()}`\n"
             
             if evaluation["missing_errors"]:
                 prompt += "\n### Errors that need to be implemented:\n"
@@ -526,78 +504,6 @@ Be thorough and precise in your analysis, ensuring that you identify exactly whe
             )
         
         return prompt
-    
-    def _find_method_bodies(self, code: str) -> List[Tuple[int, int]]:
-        """
-        Find method bodies in the code for suggesting insertion points.
-        
-        Args:
-            code: The Java code to analyze
-            
-        Returns:
-            List of (start_line, end_line) tuples for method bodies
-        """
-        lines = code.splitlines()
-        method_bodies = []
-        current_method_start = None
-        brace_count = 0
-        
-        for i, line in enumerate(lines):
-            # Skip comments
-            if is_comment(line):
-                continue
-                
-            # Look for method declarations
-            if (("public" in line or "private" in line or "protected" in line) and 
-                "(" in line and ")" in line and "{" in line and ";" not in line and
-                current_method_start is None):
-                current_method_start = i
-                brace_count = line.count("{") - line.count("}")
-            
-            # Count braces to find method end
-            elif current_method_start is not None:
-                brace_count += line.count("{") - line.count("}")
-                
-                if brace_count == 0:
-                    method_bodies.append((current_method_start, i))
-                    current_method_start = None
-        
-        return method_bodies
-    
-    def _find_class_bodies(self, code: str) -> List[Tuple[int, int]]:
-        """
-        Find class bodies in the code for suggesting insertion points.
-        
-        Args:
-            code: The Java code to analyze
-            
-        Returns:
-            List of (start_line, end_line) tuples for class bodies
-        """
-        lines = code.splitlines()
-        class_bodies = []
-        current_class_start = None
-        brace_count = 0
-        
-        for i, line in enumerate(lines):
-            # Skip comments
-            if is_comment(line):
-                continue
-                
-            # Look for class declarations
-            if "class" in line and "{" in line and ";" not in line and current_class_start is None:
-                current_class_start = i
-                brace_count = line.count("{") - line.count("}")
-            
-            # Count braces to find class end
-            elif current_class_start is not None:
-                brace_count += line.count("{") - line.count("}")
-                
-                if brace_count == 0:
-                    class_bodies.append((current_class_start, i))
-                    current_class_start = None
-        
-        return class_bodies
     
     def _infer_domain_from_code(self, code: str) -> str:
         """
