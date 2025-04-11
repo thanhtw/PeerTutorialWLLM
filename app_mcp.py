@@ -237,7 +237,7 @@ def generate_code_problem(workflow: MCPJavaCodeReviewGraph,
                                       f"({new_found/total*100:.1f}%)")
                                 
                                 if new_found > previous_found:
-                                    st.success(f" Added {new_found - previous_found} new errors in this attempt!")
+                                    st.success(f" Added {new_found - previous_found} new errors in this attempt!")
                                     
                                 previous_found = new_found
                             
@@ -248,9 +248,9 @@ def generate_code_problem(workflow: MCPJavaCodeReviewGraph,
                     
                     # Show final outcome
                     if quality_percentage == 100:
-                        st.success(" All requested errors successfully implemented!")
+                        st.success(" All requested errors successfully implemented!")
                     elif quality_percentage >= 80:
-                        st.success(f" Good quality code generated with {quality_percentage:.1f}% of requested errors!")
+                        st.success(f" Good quality code generated with {quality_percentage:.1f}% of requested errors!")
                     else:
                         st.warning(f"� Code generated with {quality_percentage:.1f}% of requested errors. " +
                                 "Some errors could not be implemented but the code is still suitable for review practice.")
@@ -628,7 +628,7 @@ def render_status_sidebar(llm_manager: LLMManager):
     else:
         st.markdown(
             '<div class="status-item">'
-            '<span>�</span>'
+            '<span>�</span>'
             '<div class="status-text">GPU</div>'
             '<span class="status-badge badge-warning">Not Available</span>'
             '</div>',
@@ -641,13 +641,13 @@ def render_status_sidebar(llm_manager: LLMManager):
     # About section with better styling
     st.markdown(
         '<div class="about-box">'
-        '<h3>=How This App Works</h3>'
+        '<h3>=� How This App Works</h3>'
         '<p>Practice Java code review in 3 simple steps:</p>'
         '<ol>'
-        '<li>=Generate Java code with intentional errors</li>'
+        '<li>=� Generate Java code with intentional errors</li>'
         '<li>='
  'Find and identify the issues in the code</li>'
-        '<li>= Get feedback on your review accuracy</li>'
+        '<li>=� Get feedback on your review accuracy</li>'
         '</ol>'
         '<p>Click "Generate Problem" to start practicing!</p>'
         '</div>',
@@ -961,11 +961,11 @@ def render_feedback_tab(workflow, feedback_display_ui):
 
 def main():
     """Enhanced main application function with MCP integration."""
-    # Start MCP server if needed
-    start_mcp_if_needed()
-    
     # Initialize session state
     init_session_state()
+    
+    # Start MCP server if needed
+    start_mcp_if_needed()
     
     # Initialize LLM manager and workflow
     llm_manager = LLMManager()
